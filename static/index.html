@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwachhRoute AI — Municipal Geospatial Intelligence & Dynamic Fleet Optimizer</title>
+  
+  <!-- Leaflet GIS CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div id="app-container">
+    
+    <!-- Top Header Navigation Bar -->
+    <header class="top-navbar">
+      <div class="brand-cluster">
+        <div class="brand-logo">
+          <i class="fa-solid fa-route"></i>
+        </div>
+        <div>
+          <div class="brand-title">
+            SwachhRoute <span class="ai-badge">AI</span>
+          </div>
+          <div class="brand-subtitle">
+            Autonomous Hotspot Clustering & Dynamic Fleet Route Optimizer • Pune Ward 12
+          </div>
+        </div>
+      </div>
+
+      <div class="tech-pills">
+        <span class="tech-pill" title="Local Meta Llama 3.2 3B runs on Apple Silicon Metal via Ollama">
+          <i class="fa-solid fa-microchip"></i> Local Llama 3.2 3B (Ollama)
+        </span>
+        <span class="tech-pill" title="DBSCAN spatial density clustering algorithm">
+          <i class="fa-solid fa-shapes"></i> DBSCAN Clustering
+        </span>
+        <span class="tech-pill" title="Google OR-Tools Capacitated Vehicle Routing Problem solver">
+          <i class="fa-solid fa-truck-ramp-box"></i> Google OR-Tools CVRP
+        </span>
+        <span class="tech-pill privacy-pill" title="100% on-premise execution compliant with Indian DPDP Act 2023">
+          <i class="fa-solid fa-shield-halved"></i> DPDP Compliant
+        </span>
+      </div>
+
+      <div class="top-actions">
+        <button id="btn-trigger-cluster" class="btn btn-secondary">
+          <i class="fa-solid fa-circle-nodes"></i> Detect Hotspots
+        </button>
+        <button id="btn-trigger-optimize" class="btn btn-primary">
+          <i class="fa-solid fa-bolt"></i> Solve Fleet Routes
+        </button>
+        <button id="btn-reset-data" class="btn btn-icon" title="Reset to Seed Data">
+          <i class="fa-solid fa-rotate-right"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Split Screen -->
+    <main class="main-layout">
+      
+      <!-- Left Control Panel -->
+      <aside class="control-sidebar">
+        
+        <!-- Navigation Tabs -->
+        <nav class="sidebar-tabs">
+          <button class="tab-btn active" data-tab="tab-overview">
+            <i class="fa-solid fa-chart-pie"></i> Overview
+          </button>
+          <button class="tab-btn" data-tab="tab-report">
+            <i class="fa-solid fa-camera"></i> Citizen Report
+          </button>
+          <button class="tab-btn" data-tab="tab-manifest">
+            <i class="fa-solid fa-clipboard-list"></i> Driver Manifest
+          </button>
+          <button class="tab-btn" data-tab="tab-policy">
+            <i class="fa-solid fa-lightbulb"></i> Policy Insights
+          </button>
+        </nav>
+
+        <!-- Tab 1: Overview & Metrics -->
+        <div id="tab-overview" class="tab-pane active">
+          
+          <!-- Impact Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">Active Reports</div>
+              <div id="stat-reports-count" class="metric-value">45</div>
+              <div class="metric-foot">Crowdsourced citizen reports</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Black Spots (DBSCAN)</div>
+              <div id="stat-clusters-count" class="metric-value">5</div>
+              <div class="metric-foot">Persistent chronic clusters</div>
+            </div>
+            <div class="metric-card highlight-metric">
+              <div class="metric-label">Fuel Saved (CVRP)</div>
+              <div id="stat-fuel-saved" class="metric-value">25.0%</div>
+              <div class="metric-foot" id="stat-fuel-litres">~1.13 L saved this shift</div>
+            </div>
+            <div class="metric-card highlight-metric">
+              <div class="metric-label">CO₂ Emissions Cut</div>
+              <div id="stat-co2-cut" class="metric-value">3.03 kg</div>
+              <div class="metric-foot" id="stat-cost-cut">₹104.5 saved / shift</div>
+            </div>
+          </div>
+
+          <!-- Section: Active Hotspots -->
+          <div class="section-header">
+            <h3><i class="fa-solid fa-fire text-danger"></i> Detected Dumping Hotspots</h3>
+            <span id="hotspots-badge" class="badge">5 Hotspots</span>
+          </div>
+          <div id="hotspots-list" class="scroll-list">
+            <!-- Dynamically populated by app.js -->
+            <div class="loading-placeholder">Loading hotspot clusters...</div>
+          </div>
+
+          <!-- Section: Fleet Routes -->
+          <div class="section-header" style="margin-top: 18px;">
+            <h3><i class="fa-solid fa-truck text-success"></i> Optimized Vehicle Routes</h3>
+            <span id="routes-badge" class="badge">3 Vehicles</span>
+          </div>
+          <div id="routes-list" class="scroll-list">
+            <!-- Dynamically populated by app.js -->
+            <div class="loading-placeholder">Click 'Solve Fleet Routes' to calculate paths...</div>
+          </div>
+
+        </div>
+
+        <!-- Tab 2: Citizen Report Portal -->
+        <div id="tab-report" class="tab-pane">
+          <div class="report-form-container">
+            <h3><i class="fa-solid fa-mobile-screen"></i> Citizen Waste Reporting Portal</h3>
+            <p class="form-desc">
+              Test live unstructured multimodal text ingestion. Click anywhere on the map to place coordinates, or choose a preset case below:
+            </p>
+
+            <!-- Quick Preset Samples -->
+            <div class="preset-chips">
+              <button class="chip-btn" data-preset="mandi">🥬 Rotten Vegetables</button>
+              <button class="chip-btn" data-preset="biomedical">💉 Medical Syringes</button>
+              <button class="chip-btn" data-preset="nullah">🌊 Clogged Nullah</button>
+              <button class="chip-btn" data-preset="malba">🧱 Concrete Malba</button>
+            </div>
+
+            <form id="citizen-report-form">
+              <div class="form-group">
+                <label>Citizen Description (Hindi / Marathi / English)</label>
+                <textarea id="input-report-text" rows="3" placeholder="e.g. Maruti mandir ke peeche kachra overflow, dead animal smell, drain completely blocked..." required></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group half">
+                  <label>Latitude</label>
+                  <input type="number" id="input-lat" step="0.000001" value="18.5085" required />
+                </div>
+                <div class="form-group half">
+                  <label>Longitude</label>
+                  <input type="number" id="input-lng" step="0.000001" value="73.8062" required />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group half">
+                  <label>Reporter Name</label>
+                  <input type="text" id="input-citizen-name" value="Omkar (Citizen)" />
+                </div>
+                <div class="form-group half">
+                  <label>Ward Area</label>
+                  <input type="text" id="input-ward" value="Ward 12 (Kothrud)" />
+                </div>
+              </div>
+
+              <button type="submit" id="btn-submit-report" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-brain"></i> Parse with Local AI & Submit Report
+              </button>
+            </form>
+
+            <!-- Live Extracted AI Metadata Box -->
+            <div id="ai-extraction-card" class="ai-result-box" style="display: none;">
+              <div class="ai-header">
+                <i class="fa-solid fa-robot"></i>
+                <span id="ai-engine-label">Meta Llama 3.2 3B Structured Extraction:</span>
+              </div>
+              <div class="ai-tags">
+                <span id="tag-hazard" class="tag tag-hazard">Hazard: -</span>
+                <span id="tag-severity" class="tag tag-severity">Severity: -/10</span>
+                <span id="tag-machinery" class="tag tag-machinery">Vehicle: -</span>
+                <span id="tag-urgency" class="tag tag-urgency">Urgency: -</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Tab 3: Driver Manifest -->
+        <div id="tab-manifest" class="tab-pane">
+          <div class="manifest-container">
+            <div class="manifest-selector">
+              <label>Select Truck Dispatch:</label>
+              <select id="select-truck-manifest">
+                <option value="TRUCK_01">Compactor MH-12-Q-4481 (Heavy)</option>
+                <option value="TRUCK_02">Tipper MH-12-RN-8812 (Mini)</option>
+                <option value="TRUCK_03">Tipper MH-12-RN-9023 (Mini)</option>
+              </select>
+            </div>
+
+            <div id="manifest-content" class="manifest-paper">
+              <!-- Dynamically populated -->
+              <div class="loading-placeholder">Loading driver manifest...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Policy Insights -->
+        <div id="tab-policy" class="tab-pane">
+          <div class="policy-container">
+            <h3><i class="fa-solid fa-file-shield text-warning"></i> Root-Cause Prevention Intelligence</h3>
+            <p class="form-desc">
+              Llama 3.2 3B analyzes chronic recurrence patterns across months and provides actionable municipal policy interventions to eradicate black spots permanently.
+            </p>
+            <div id="policy-insights-list" class="scroll-list">
+              <!-- Dynamically populated -->
+              <div class="loading-placeholder">Loading policy insights...</div>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- Right Interactive Map Area -->
+      <section class="map-viewport">
+        <div id="map"></div>
+        
+        <!-- Map Floating Legend & Controls -->
+        <div class="map-overlay-legend">
+          <h4><i class="fa-solid fa-layer-group"></i> Layer Visibility</h4>
+          <label class="legend-item">
+            <input type="checkbox" id="toggle-reports" checked />
+            <span class="legend-dot dot-report"></span> Raw Citizen Reports (45)
+          </label>
+          <label class="legend-item">
+            <input type="checkbox" id="toggle-clusters" checked />
+            <span class="legend-dot dot-cluster"></span> DBSCAN Hotspot Polygons (5)
+          </label>
+          <label class="legend-item">
+            <input type="checkbox" id="toggle-routes" checked />
+            <span class="legend-dot dot-route"></span> OR-Tools Optimized Routes (3)
+          </label>
+          <div class="legend-facility">
+            <span><i class="fa-solid fa-square text-primary"></i> Municipal Depot</span>
+            <span><i class="fa-solid fa-triangle text-purple"></i> Transfer Facility</span>
+          </div>
+        </div>
+
+        <!-- Real-Time Toast Notification Banner -->
+        <div id="toast-banner" class="toast-banner">
+          <i class="fa-solid fa-circle-check"></i>
+          <span id="toast-text">System operational. Ready for demonstration.</span>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Leaflet GIS JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Application Client Controller -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
