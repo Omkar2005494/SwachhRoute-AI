@@ -119,6 +119,19 @@ export function AIIntelligenceModal({
             </div>
           )}
 
+          {/* Failed / Incomplete State */}
+          {!analysis && !isAnalyzing && (
+            <div className="p-8 rounded-xl border border-rose-500/30 bg-rose-950/20 text-center space-y-3">
+              <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-white">AI Analysis Incomplete or Failed</h4>
+                <p className="text-xs text-slate-400 font-mono">
+                  The local Llama 3.2 3B inference could not be completed or timed out. You can retry the analysis below.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Validated Analysis Display */}
           {analysis && !isAnalyzing && (
             <div className="space-y-4">
@@ -267,10 +280,10 @@ export function AIIntelligenceModal({
                 type="button"
                 onClick={() => onReanalyze(report.id)}
                 disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 disabled:opacity-50 transition-colors cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                <span>Re-analyze with Local AI</span>
+                <span>{isAnalyzing ? 'Analyzing...' : !analysis ? 'Retry Local AI Analysis' : 'Re-analyze with Local AI'}</span>
               </button>
             )}
           </div>

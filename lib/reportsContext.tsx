@@ -73,7 +73,7 @@ interface ReportsContextType {
   isGeneratingManifest: boolean;
   officerOverrides: OfficerOverride[];
   addReport: (input: RawReportInput) => { success: boolean; report?: WasteReport; errors?: string[] };
-  triggerAIAnalysis: (reportId: string) => Promise<void>;
+  triggerAIAnalysis: (reportId: string, directDescription?: string) => Promise<void>;
   triggerClustering: () => Promise<void>;
   triggerRouteOptimization: () => Promise<void>;
   recalculateRoadRoutes: () => Promise<void>;
@@ -174,6 +174,10 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
   const firestoreHydrated = useRef<boolean>(false);
   const [firestoreReady, setFirestoreReady] = useState<boolean>(false);
 
+  // Maintain an always-fresh reportsRef to eliminate stale closure issues
+  const reportsRef = useRef(reports);
+  reportsRef.current = reports;
+
   // Check Ollama health
   const checkAIHealth = useCallback(async () => {
     setAiEngineStatus((prev) => ({ ...prev, checking: true }));
@@ -207,27 +211,44 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Trigger AI analysis for a specific report
-  const triggerAIAnalysis = useCallback(async (reportId: string) => {
+  const triggerAIAnalysis = useCallback(async (reportId: string, directDescription?: string) => {
     if (activeInferences.current.has(reportId)) return;
 
-    const targetReport = reports.find((r) => r.id === reportId);
-    if (!targetReport) return;
+    // Use direct description if provided, otherwise look up from latest reportsRef
+    const targetReport = reportsRef.current.find((r) => r.id === reportId);
+    const description = directDescription || targetReport?.description;
+
+    if (!description || !description.trim()) {
+      console.warn(`[ReportsContext] No description available for AI analysis on report ${reportId}. Marking as failed.`);
+      setReports((prev) =>
+        prev.map((r) => (r.id === reportId ? { ...r, aiStatus: 'failed' as AIStatus } : r))
+      );
+      return;
+    }
 
     activeInferences.current.add(reportId);
 
+    // Explicitly transition to analyzing
     setReports((prev) =>
       prev.map((r) => (r.id === reportId ? { ...r, aiStatus: 'analyzing' as AIStatus } : r))
     );
+
+    // 30-second client-side timeout controller
+    const abortController = new AbortController();
+    const timeoutTimer = setTimeout(() => abortController.abort(), 30000);
 
     try {
       const res = await fetch('/api/ai/analyze-complaint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          description: targetReport.description,
-          reportId: targetReport.id,
+          description,
+          reportId,
         }),
+        signal: abortController.signal,
       });
+
+      clearTimeout(timeoutTimer);
 
       if (!res.ok) {
         throw new Error(`API returned HTTP ${res.status}`);
@@ -237,6 +258,10 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
       const analysis: ComplaintAnalysis = data.analysis;
       const isFallback = Boolean(data.usedFallback);
 
+      if (!analysis) {
+        throw new Error('No analysis data received in API response');
+      }
+
       setReports((prev) =>
         prev.map((r) => {
           if (r.id !== reportId) return r;
@@ -244,7 +269,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
           const updated: WasteReport = {
             ...r,
             aiAnalyzed: true,
-            aiStatus: isFallback ? 'offline_fallback' : 'complete',
+            aiStatus: isFallback ? ('offline_fallback' as AIStatus) : ('complete' as AIStatus),
             aiAnalysis: analysis,
             category: mapAICategoryToWasteCategory(analysis.category),
             severity: mapAISeverityToEnum(analysis.severity),
@@ -256,15 +281,21 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
           return updated;
         })
       );
-    } catch (err) {
-      console.warn(`[ReportsContext] AI analysis failed for report ${reportId}:`, err);
+    } catch (err: any) {
+      clearTimeout(timeoutTimer);
+      const isTimeout = err?.name === 'AbortError';
+      console.warn(
+        `[ReportsContext] AI analysis ${isTimeout ? 'timed out after 30s' : 'failed'} for report ${reportId}:`,
+        err
+      );
+      // Guarantee terminal failure transition so report is never trapped in analyzing
       setReports((prev) =>
         prev.map((r) => (r.id === reportId ? { ...r, aiStatus: 'failed' as AIStatus } : r))
       );
     } finally {
       activeInferences.current.delete(reportId);
     }
-  }, [reports]);
+  }, []);
 
   // Execute Geospatial DBSCAN Clustering
   const executeClustering = useCallback(async (currentReports: WasteReport[]) => {
@@ -450,10 +481,10 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
-    // Automatically trigger local Llama 3.2 3B analysis asynchronously
+    // Automatically trigger local Llama 3.2 3B analysis asynchronously with direct description
     setTimeout(() => {
-      triggerAIAnalysis(newReport.id);
-    }, 100);
+      triggerAIAnalysis(newReport.id, newReport.description);
+    }, 50);
 
     return { success: true, report: newReport };
   };

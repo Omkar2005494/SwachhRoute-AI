@@ -155,6 +155,7 @@ export default function ReportsPage() {
                 const isAnalyzing = report.aiStatus === 'analyzing';
                 const isComplete = report.aiStatus === 'complete';
                 const isFallback = report.aiStatus === 'offline_fallback';
+                const isFailed = report.aiStatus === 'failed';
 
                 return (
                   <tr key={report.id} className="hover:bg-command-surface/40 transition-colors">
@@ -232,10 +233,14 @@ export default function ReportsPage() {
                     {/* Local AI Understanding Status */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       {isAnalyzing ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 animate-pulse">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAIModal(report)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 animate-pulse hover:bg-cyan-900/60 transition-colors cursor-pointer"
+                        >
                           <RefreshCw className="w-3 h-3 animate-spin" />
                           <span>Analyzing locally...</span>
-                        </span>
+                        </button>
                       ) : isComplete ? (
                         <button
                           type="button"
@@ -259,10 +264,19 @@ export default function ReportsPage() {
                           <AlertTriangle className="w-3 h-3 text-amber-400" />
                           <span>Rule-Based Fallback</span>
                         </button>
+                      ) : isFailed ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAIModal(report)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 transition-colors cursor-pointer"
+                        >
+                          <AlertTriangle className="w-3 h-3 text-rose-400" />
+                          <span>Analysis Failed (Retry)</span>
+                        </button>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => triggerAIAnalysis(report.id)}
+                          onClick={() => triggerAIAnalysis(report.id, report.description)}
                           className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                         >
                           <Sparkles className="w-3 h-3 text-slate-400" />
