@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #07090e;
+    color: #f8fafc;
+    overflow: hidden;
+  }
+}
+
+/* Custom Glassmorphism & Neon Glow Utilities */
+.glass-panel {
+  background: rgba(14, 19, 31, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid #212d45;
+}
+
+.glass-card {
+  background: #141c2e;
+  border: 1px solid #212d45;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  background: #1c2740;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.pulse-emerald {
+  animation: pulse-glow-emerald 2.5s infinite;
+}
+
+@keyframes pulse-glow-emerald {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+::-webkit-scrollbar-thumb {
+  background: #212d45;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
