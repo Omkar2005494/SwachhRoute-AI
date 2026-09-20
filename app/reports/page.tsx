@@ -32,7 +32,10 @@ export default function ReportsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
-  const [selectedReportForAI, setSelectedReportForAI] = useState<WasteReport | null>(null);
+  const [selectedReportIdForAI, setSelectedReportIdForAI] = useState<string | null>(null);
+  const selectedReportForAI = selectedReportIdForAI
+    ? reports.find((r) => r.id === selectedReportIdForAI) || null
+    : null;
 
   const filteredReports = reports.filter((report) => {
     const matchesCategory =
@@ -45,7 +48,7 @@ export default function ReportsPage() {
   });
 
   const handleOpenAIModal = (report: WasteReport) => {
-    setSelectedReportForAI(report);
+    setSelectedReportIdForAI(report.id);
   };
 
   return (
@@ -339,15 +342,8 @@ export default function ReportsPage() {
       {selectedReportForAI && (
         <AIIntelligenceModal
           report={selectedReportForAI}
-          onClose={() => setSelectedReportForAI(null)}
-          onReanalyze={(id) => {
-            triggerAIAnalysis(id);
-            // Refresh modal state
-            setTimeout(() => {
-              const updated = reports.find((r) => r.id === id);
-              if (updated) setSelectedReportForAI(updated);
-            }, 300);
-          }}
+          onClose={() => setSelectedReportIdForAI(null)}
+          onReanalyze={(id, desc) => triggerAIAnalysis(id, desc)}
         />
       )}
 

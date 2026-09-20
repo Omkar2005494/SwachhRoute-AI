@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/Badge';
 interface AIIntelligenceModalProps {
   report: WasteReport | null;
   onClose: () => void;
-  onReanalyze?: (reportId: string) => void;
+  onReanalyze?: (reportId: string, directDescription?: string) => void;
 }
 
 export function AIIntelligenceModal({
@@ -278,12 +278,17 @@ export function AIIntelligenceModal({
             {onReanalyze && report.id && (
               <button
                 type="button"
-                onClick={() => onReanalyze(report.id)}
-                disabled={isAnalyzing}
-                className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 disabled:opacity-50 transition-colors cursor-pointer"
+                onClick={() => onReanalyze(report.id, report.description)}
+                className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                <span>{isAnalyzing ? 'Analyzing...' : !analysis ? 'Retry Local AI Analysis' : 'Re-analyze with Local AI'}</span>
+                <span>
+                  {isAnalyzing
+                    ? 'Analyzing (Click to Retry)'
+                    : !analysis
+                    ? 'Run Local AI Analysis'
+                    : 'Re-analyze with Local AI'}
+                </span>
               </button>
             )}
           </div>

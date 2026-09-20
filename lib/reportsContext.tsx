@@ -437,6 +437,20 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  // Auto-trigger AI analysis for any un-analyzed custom reports (e.g. hydrated from localStorage or previously pending)
+  const autoAnalyzedReports = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const unanalyzed = reports.filter(
+      (r) => !r.aiAnalyzed && !autoAnalyzedReports.current.has(r.id)
+    );
+    if (unanalyzed.length > 0) {
+      unanalyzed.forEach((r) => {
+        autoAnalyzedReports.current.add(r.id);
+        triggerAIAnalysis(r.id, r.description);
+      });
+    }
+  }, [reports, triggerAIAnalysis]);
+
   const addReport = (
     input: RawReportInput
   ): { success: boolean; report?: WasteReport; errors?: string[] } => {
