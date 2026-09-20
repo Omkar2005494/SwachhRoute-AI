@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "clsx": "^2.1.1",
     "firebase": "^12.19.0",
     "leaflet": "^1.9.4",

@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
+import { useReports } from '@/lib/reportsContext';
+
 interface NavItem {
   name: string;
   href: string;
@@ -25,59 +27,60 @@ interface NavItem {
   badgeColor?: 'cyan' | 'purple' | 'amber';
 }
 
-const NAV_ITEMS: NavItem[] = [
-  {
-    name: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    name: 'Reports',
-    href: '/reports',
-    icon: FileText,
-    badge: '8 Active',
-    badgeColor: 'cyan',
-  },
-  {
-    name: 'Hotspots',
-    href: '/hotspots',
-    icon: Flame,
-    badge: '3 Clusters',
-    badgeColor: 'amber',
-  },
-  {
-    name: 'Fleet',
-    href: '/fleet',
-    icon: Truck,
-    badge: '4 Units',
-    badgeColor: 'purple',
-  },
-  {
-    name: 'Routes',
-    href: '/routes',
-    icon: RouteIcon,
-  },
-  {
-    name: 'Manifests',
-    href: '/manifests',
-    icon: ClipboardList,
-  },
-  {
-    name: 'Officer Review',
-    href: '/officer',
-    icon: ShieldCheck,
-    badge: 'Override',
-    badgeColor: 'purple',
-  },
-  {
-    name: 'Insights',
-    href: '/insights',
-    icon: Sparkles,
-  },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
+  const { totalReports, hotspots, fleet } = useReports();
+
+  const navItems: NavItem[] = [
+    {
+      name: 'Dashboard',
+      href: '/dashboard',
+      icon: LayoutDashboard,
+    },
+    {
+      name: 'Reports',
+      href: '/reports',
+      icon: FileText,
+      badge: `${totalReports} Active`,
+      badgeColor: 'cyan',
+    },
+    {
+      name: 'Hotspots',
+      href: '/hotspots',
+      icon: Flame,
+      badge: `${hotspots.length} Clusters`,
+      badgeColor: 'amber',
+    },
+    {
+      name: 'Fleet',
+      href: '/fleet',
+      icon: Truck,
+      badge: `${fleet.length} Units`,
+      badgeColor: 'purple',
+    },
+    {
+      name: 'Routes',
+      href: '/routes',
+      icon: RouteIcon,
+    },
+    {
+      name: 'Manifests',
+      href: '/manifests',
+      icon: ClipboardList,
+    },
+    {
+      name: 'Officer Review',
+      href: '/officer',
+      icon: ShieldCheck,
+      badge: 'Override',
+      badgeColor: 'purple',
+    },
+    {
+      name: 'Insights',
+      href: '/insights',
+      icon: Sparkles,
+    },
+  ];
 
   return (
     <aside className="w-64 bg-command-dark/95 border-r border-command-border flex flex-col shrink-0 h-[calc(100vh-4rem)] sticky top-16 z-20">
@@ -94,7 +97,7 @@ export function Sidebar() {
 
       {/* Nav Link List */}
       <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const isActive =
             pathname === item.href || (item.href === '/dashboard' && pathname === '/');
           const Icon = item.icon;
