@@ -340,7 +340,11 @@ export default function RoutesPage() {
                       </Badge>
                       <Badge
                         variant={
-                          route.operationalStatus === 'dispatched'
+                          route.operationalStatus === 'completed'
+                            ? 'emerald'
+                            : route.operationalStatus === 'awaiting_weighbridge'
+                            ? 'purple'
+                            : route.operationalStatus === 'dispatched'
                             ? 'emerald'
                             : route.operationalStatus === 'on_hold'
                             ? 'rose'
@@ -349,7 +353,7 @@ export default function RoutesPage() {
                             : 'cyan'
                         }
                       >
-                        {(route.operationalStatus || 'OPTIMIZED').toUpperCase()}
+                        {(route.operationalStatus || 'OPTIMIZED').replace(/_/g, ' ').toUpperCase()}
                       </Badge>
                     </div>
                   </div>

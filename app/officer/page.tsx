@@ -38,6 +38,7 @@ export default function OfficerPage() {
     hotspots,
     driverManifests,
     officerOverrides,
+    weighbridgeTickets,
     applyPriorityOverride,
     reassignVehicle,
     reorderStops,
@@ -833,6 +834,99 @@ export default function OfficerPage() {
         </div>
 
         <OverrideHistory overrides={officerOverrides} />
+      </div>
+
+      {/* Phase 6D: Weighbridge Scale Certification & Anomaly Audit */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+            <Scale className="w-4 h-4 text-cyan-400" />
+            <span>Municipal Weighbridge Scale Tickets & Anomaly Audit</span>
+          </h2>
+          <span className="text-xs font-mono text-slate-400">
+            {weighbridgeTickets.length} certified scale records
+          </span>
+        </div>
+
+        {weighbridgeTickets.length === 0 ? (
+          <Card className="p-6 text-center border-dashed border-command-border/60">
+            <Scale className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+            <p className="text-xs text-slate-400">No weighbridge scale tickets certified yet.</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Tickets are certified when drivers complete collection routes and return to the municipal depot weighbridge on the Manifests page.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {weighbridgeTickets.map((ticket) => {
+              const isOverload = ticket.alertLevel === 'severe_overload';
+              const isAnomaly = Math.abs(ticket.variancePercentage) > 20;
+
+              return (
+                <div
+                  key={ticket.ticketId}
+                  className={`p-4 rounded-xl border space-y-3 transition-colors ${
+                    isOverload
+                      ? 'bg-rose-950/20 border-rose-500/40'
+                      : isAnomaly
+                      ? 'bg-amber-950/20 border-amber-500/40'
+                      : 'bg-command-surface border-command-border'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Scale className="w-4 h-4 text-cyan-400" />
+                      <span className="font-mono text-sm font-bold text-white">
+                        Ticket #{ticket.ticketId}
+                      </span>
+                      <Badge variant={isOverload ? 'rose' : isAnomaly ? 'amber' : 'emerald'}>
+                        {ticket.alertLevel.replace(/_/g, ' ').toUpperCase()}
+                      </Badge>
+                      {ticket.status === 'flagged_for_audit' && (
+                        <Badge variant="rose">FLAGGED FOR AUDIT</Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {new Date(ticket.weighedAt).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs font-mono p-2.5 rounded-lg bg-command-dark/60 border border-command-border/60">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Vehicle / Route:</span>
+                      <span className="text-slate-200 font-bold">{ticket.vehicleId} ({ticket.routeId})</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Gross Scale:</span>
+                      <span className="text-slate-200 font-bold">{ticket.grossWeightKg.toLocaleString()} kg</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Empty Tare:</span>
+                      <span className="text-slate-200 font-bold">{ticket.tareWeightKg.toLocaleString()} kg</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Net Certified:</span>
+                      <span className="text-cyan-300 font-bold">{ticket.netPayloadKg.toLocaleString()} kg</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">AI Variance:</span>
+                      <span className={`font-bold ${isAnomaly ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {ticket.variancePercentage > 0 ? '+' : ''}{ticket.variancePercentage}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>
+                      Operator: <strong className="text-slate-300">{ticket.operatorName}</strong> • Facility: <strong className="text-slate-300">{ticket.disposalFacility}</strong>
+                    </span>
+                    {ticket.notes && <span className="italic text-slate-300">&ldquo;{ticket.notes}&rdquo;</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -22,6 +22,11 @@ import {
   OfficerOverrideStatus,
   OperationalRouteStatus,
   HotspotUrgency,
+  ReportStatus,
+  PickupVerification,
+  PickupVerificationStatus,
+  WeighbridgeTicket,
+  WeighbridgeAlertLevel,
 } from '@/types';
 import { DEMO_REPORTS, DEMO_HOTSPOTS, DEMO_FLEET, DEMO_ROUTES, DEMONSTRATION_DEPOT } from '@/data/demo';
 import {
@@ -109,6 +114,35 @@ interface ReportsContextType {
   importCustomDataset: (importedReports: WasteReport[], name?: string, city?: string) => Promise<void>;
   exportReports: (format: 'csv' | 'geojson') => string;
   resetCurrentDataset: () => Promise<void>;
+  // Phase 6D: Driver Pickup Verification & Weighbridge Integration
+  pickupVerifications: Record<string, PickupVerification[]>;
+  weighbridgeTickets: WeighbridgeTicket[];
+  verifyStopPickup: (
+    manifestId: string,
+    hotspotId: string,
+    verification: {
+      status: PickupVerificationStatus;
+      actualWasteCategory?: WasteCategory;
+      actualEstimatedKg?: number;
+      driverNotes?: string;
+      driverName?: string;
+    }
+  ) => Promise<{ success: boolean; error?: string; verification?: PickupVerification }>;
+  recordWeighbridgeTicket: (
+    entry: {
+      routeId: string;
+      manifestId: string;
+      vehicleId: string;
+      driverName: string;
+      operatorName: string;
+      grossWeightKg: number;
+      tareWeightKg: number;
+      disposalFacility?: string;
+      notes?: string;
+    }
+  ) => Promise<{ success: boolean; error?: string; ticket?: WeighbridgeTicket }>;
+  getManifestVerifications: (manifestId: string) => PickupVerification[];
+  getRouteWeighbridgeTicket: (routeId: string) => WeighbridgeTicket | undefined;
 }
 
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
@@ -186,6 +220,10 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
 
   // Phase 6C: Officer Operations & Human-in-the-Loop Override State
   const [officerOverrides, setOfficerOverrides] = useState<OfficerOverride[]>([]);
+
+  // Phase 6D: Driver Pickup Verification & Weighbridge Scale State
+  const [pickupVerifications, setPickupVerifications] = useState<Record<string, PickupVerification[]>>({});
+  const [weighbridgeTickets, setWeighbridgeTickets] = useState<WeighbridgeTicket[]>([]);
 
   const [aiEngineStatus, setAiEngineStatus] = useState<AIEngineStatus>({
     connected: false,
@@ -1218,6 +1256,243 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [officerOverrides, firestoreReady]);
 
+  // ─── Phase 6D: Driver Pickup Verification & Weighbridge Integration ──────
+  const verifyStopPickup = useCallback(
+    async (
+      manifestId: string,
+      hotspotId: string,
+      verification: {
+        status: PickupVerificationStatus;
+        actualWasteCategory?: WasteCategory;
+        actualEstimatedKg?: number;
+        driverNotes?: string;
+        driverName?: string;
+      }
+    ): Promise<{ success: boolean; error?: string; verification?: PickupVerification }> => {
+      const manifest = driverManifests.find((m) => m.manifestId === manifestId);
+      if (!manifest) {
+        return { success: false, error: `Manifest ${manifestId} not found.` };
+      }
+
+      const stopIndex = manifest.stops.findIndex((s) => s.hotspotId === hotspotId);
+      if (stopIndex === -1) {
+        return { success: false, error: `Hotspot ${hotspotId} not found in manifest stops.` };
+      }
+
+      const stop = manifest.stops[stopIndex];
+      const targetHotspot = hotspots.find((h) => h.id === hotspotId);
+      const linkedReportIds = targetHotspot?.reportIds || [];
+      const timestamp = new Date().toISOString();
+
+      const newVerification: PickupVerification = {
+        verificationId: `VERIF-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        manifestId,
+        routeId: manifest.routeId,
+        hotspotId,
+        stopIndex,
+        verifiedByDriverName: verification.driverName || manifest.driverName || 'Field Driver',
+        timestamp,
+        status: verification.status,
+        actualWasteCategory: verification.actualWasteCategory || stop.dominantCategory,
+        actualEstimatedKg: verification.actualEstimatedKg ?? stop.estimatedDemandKg,
+        driverNotes: verification.driverNotes || '',
+        resolvedReportIds: linkedReportIds,
+      };
+
+      // 1. Record verification in local state
+      setPickupVerifications((prev) => {
+        const existing = prev[manifestId] || [];
+        const filtered = existing.filter((v) => v.hotspotId !== hotspotId);
+        return { ...prev, [manifestId]: [...filtered, newVerification] };
+      });
+
+      // 2. Update stop inside manifest
+      setDriverManifests((prev) =>
+        prev.map((m) => {
+          if (m.manifestId !== manifestId) return m;
+          const updatedStops = m.stops.map((s, idx) => {
+            if (idx !== stopIndex) return s;
+            return {
+              ...s,
+              verificationStatus: verification.status,
+              verifiedAt: timestamp,
+              verifiedBy: newVerification.verifiedByDriverName,
+              actualWasteCategory: newVerification.actualWasteCategory,
+              driverNotes: newVerification.driverNotes,
+            };
+          });
+
+          return {
+            ...m,
+            stops: updatedStops,
+          };
+        })
+      );
+
+      // 3. Auto-resolve underlying citizen reports if collected
+      if (verification.status === 'collected' && linkedReportIds.length > 0) {
+        setReports((prev) =>
+          prev.map((r) => {
+            if (linkedReportIds.includes(r.id)) {
+              return {
+                ...r,
+                status: 'collected' as ReportStatus,
+              };
+            }
+            return r;
+          })
+        );
+      }
+
+      // 4. Advance route status to awaiting_weighbridge if all stops are serviced
+      setRoutes((prev) =>
+        prev.map((r) => {
+          if (r.id !== manifest.routeId) return r;
+          const otherVerifs = (pickupVerifications[manifestId] || []).filter((v) => v.hotspotId !== hotspotId);
+          const isDone = (otherVerifs.length + 1) >= manifest.stops.length;
+          if (isDone) {
+            return {
+              ...r,
+              operationalStatus: 'awaiting_weighbridge' as OperationalRouteStatus,
+            };
+          }
+          return r;
+        })
+      );
+
+      return { success: true, verification: newVerification };
+    },
+    [driverManifests, hotspots, pickupVerifications]
+  );
+
+  const recordWeighbridgeTicket = useCallback(
+    async (entry: {
+      routeId: string;
+      manifestId: string;
+      vehicleId: string;
+      driverName: string;
+      operatorName: string;
+      grossWeightKg: number;
+      tareWeightKg: number;
+      disposalFacility?: string;
+      notes?: string;
+    }): Promise<{ success: boolean; error?: string; ticket?: WeighbridgeTicket }> => {
+      const {
+        routeId,
+        manifestId,
+        vehicleId,
+        driverName,
+        operatorName,
+        grossWeightKg,
+        tareWeightKg,
+        disposalFacility = `${activeDataset.name} Weighbridge & Processing Facility`,
+        notes = '',
+      } = entry;
+
+      if (!operatorName || !operatorName.trim()) {
+        return { success: false, error: 'Scale operator name is required for official weighbridge certification.' };
+      }
+
+      if (grossWeightKg <= 0 || tareWeightKg <= 0) {
+        return { success: false, error: 'Gross weight and tare weight must be positive scale readings.' };
+      }
+
+      if (grossWeightKg <= tareWeightKg) {
+        return { success: false, error: `Gross scale weight (${grossWeightKg} kg) must exceed empty unladen tare weight (${tareWeightKg} kg).` };
+      }
+
+      const vehicle = fleet.find((v) => v.id === vehicleId);
+      const manifest = driverManifests.find((m) => m.manifestId === manifestId);
+      const estimatedDemandKg = manifest ? manifest.estimatedLoadKg : 0;
+      const netPayloadKg = Math.round(grossWeightKg - tareWeightKg);
+      const varianceKg = Math.round(netPayloadKg - estimatedDemandKg);
+      const variancePercentage = estimatedDemandKg > 0
+        ? Math.round(((netPayloadKg - estimatedDemandKg) / estimatedDemandKg) * 1000) / 10
+        : 0;
+
+      let alertLevel: WeighbridgeAlertLevel = 'normal';
+      const maxCapacity = vehicle?.capacityKg || 8000;
+
+      if (netPayloadKg > maxCapacity) {
+        alertLevel = 'severe_overload';
+      } else if (variancePercentage > 20) {
+        alertLevel = 'overweight_flag';
+      } else if (variancePercentage < -20) {
+        alertLevel = 'underweight_flag';
+      } else {
+        alertLevel = 'normal';
+      }
+
+      const ticketId = `WB-${activeDatasetId.toUpperCase().slice(0, 4)}-${Date.now().toString().slice(-6)}`;
+      const timestamp = new Date().toISOString();
+
+      const ticket: WeighbridgeTicket = {
+        ticketId,
+        vehicleId,
+        routeId,
+        manifestId,
+        depotId: activeDepot.id,
+        depotName: activeDepot.name,
+        driverName: driverName || manifest?.driverName || vehicle?.driverName || 'Municipal Driver',
+        operatorName: operatorName.trim(),
+        grossWeightKg,
+        tareWeightKg,
+        netPayloadKg,
+        estimatedDemandKg,
+        varianceKg,
+        variancePercentage,
+        alertLevel,
+        disposalFacility,
+        weighedAt: timestamp,
+        status: alertLevel === 'severe_overload' || Math.abs(variancePercentage) > 30 ? 'flagged_for_audit' : 'completed',
+        notes,
+      };
+
+      setWeighbridgeTickets((prev) => [ticket, ...prev]);
+
+      setDriverManifests((prev) =>
+        prev.map((m) =>
+          m.manifestId === manifestId
+            ? { ...m, status: 'completed' as any, weighbridgeTicketId: ticketId }
+            : m
+        )
+      );
+
+      setRoutes((prev) =>
+        prev.map((r) =>
+          r.id === routeId
+            ? { ...r, status: 'completed' as any, operationalStatus: 'completed' as OperationalRouteStatus }
+            : r
+        )
+      );
+
+      setFleet((prev) =>
+        prev.map((v) =>
+          v.id === vehicleId
+            ? { ...v, status: 'available', currentLoadKg: 0 }
+            : v
+        )
+      );
+
+      return { success: true, ticket };
+    },
+    [activeDataset.name, activeDatasetId, activeDepot.id, activeDepot.name, driverManifests, fleet]
+  );
+
+  const getManifestVerifications = useCallback(
+    (manifestId: string): PickupVerification[] => {
+      return pickupVerifications[manifestId] || [];
+    },
+    [pickupVerifications]
+  );
+
+  const getRouteWeighbridgeTicket = useCallback(
+    (routeId: string): WeighbridgeTicket | undefined => {
+      return weighbridgeTickets.find((t) => t.routeId === routeId);
+    },
+    [weighbridgeTickets]
+  );
+
   // ─── Real Municipal Dataset Management ──────
   const switchDataset = useCallback(
     async (datasetId: string) => {
@@ -1232,6 +1507,8 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
       setOptimizationResult(null);
       setDriverManifests([]);
       setOfficerOverrides([]);
+      setPickupVerifications({});
+      setWeighbridgeTickets([]);
       clearRoadRoutingCache();
 
       const formattedReports: WasteReport[] = targetDataset.reports.map((r) => ({
@@ -1345,6 +1622,8 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
       setOptimizationResult(null);
       setDriverManifests([]);
       setOfficerOverrides([]);
+      setPickupVerifications({});
+      setWeighbridgeTickets([]);
       clearRoadRoutingCache();
 
       const formattedReports: WasteReport[] = importedReports.map((r) => ({
@@ -1438,6 +1717,13 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
         importCustomDataset,
         exportReports,
         resetCurrentDataset,
+        // Phase 6D: Driver Pickup Verification & Weighbridge Integration
+        pickupVerifications,
+        weighbridgeTickets,
+        verifyStopPickup,
+        recordWeighbridgeTicket,
+        getManifestVerifications,
+        getRouteWeighbridgeTicket,
       }}
     >
       {children}

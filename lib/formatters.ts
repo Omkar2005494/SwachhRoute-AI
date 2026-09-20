@@ -117,3 +117,16 @@ export function formatDateTime(dateInput?: string | Date | number): string {
   }
 }
 
+/**
+ * Formats a weight in kilograms to a formatted string (e.g. "4,500 kg (4.5 t)").
+ */
+export function formatWeight(weightKg?: number | null): string {
+  if (weightKg === null || weightKg === undefined) return '0 kg';
+  if (weightKg >= 1000) {
+    const tons = Math.round((weightKg / 1000) * 10) / 10;
+    return `${weightKg.toLocaleString()} kg (${tons} t)`;
+  }
+  return `${Math.round(weightKg).toLocaleString()} kg`;
+}
+
+

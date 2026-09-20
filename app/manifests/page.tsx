@@ -27,7 +27,11 @@ import {
   Layers,
   ArrowRight,
   ShieldCheck,
+  FileCheck2,
+  Check,
 } from 'lucide-react';
+import { PickupVerificationModal, WeighbridgeModal } from '@/components/verification';
+import { ManifestStop } from '@/types';
 
 export default function ManifestsPage() {
   const {
@@ -38,10 +42,16 @@ export default function ManifestsPage() {
     isGeneratingManifest,
     generateManifest,
     regenerateManifest,
+    verifyStopPickup,
+    recordWeighbridgeTicket,
+    getRouteWeighbridgeTicket,
   } = useReports();
 
   // If manifests exist, select first by default or allow switching
   const [selectedManifestId, setSelectedManifestId] = useState<string | null>(null);
+  const [selectedStopForVerification, setSelectedStopForVerification] = useState<ManifestStop | null>(null);
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [isWeighbridgeModalOpen, setIsWeighbridgeModalOpen] = useState(false);
 
   const activeManifest =
     driverManifests.find((m) => m.manifestId === selectedManifestId) ||
@@ -49,6 +59,8 @@ export default function ManifestsPage() {
     null;
 
   const linkedRoute = activeManifest ? routes.find((r) => r.id === activeManifest.routeId) : null;
+  const assignedVehicle = activeManifest ? fleet.find((v) => v.id === activeManifest.vehicleId) : undefined;
+  const activeWeighbridgeTicket = activeManifest ? getRouteWeighbridgeTicket(activeManifest.routeId) : undefined;
 
   // Active primary hauling route from OR-Tools
   const primaryRoute = routes.find((r) => r.stops && r.stops.length > 0) || routes[0];
@@ -496,37 +508,119 @@ export default function ManifestsPage() {
                   </div>
                 </div>
 
+                {/* Collection Verification Progress */}
+                <div className="p-3 bg-command-dark/60 border border-command-border rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 font-medium flex items-center gap-1.5">
+                      <FileCheck2 className="w-4 h-4 text-emerald-400" />
+                      Field Collection Verification Progress
+                    </span>
+                    <span className="font-mono text-emerald-400 font-bold">
+                      {activeManifest.stops.filter((s) => s.verificationStatus && s.verificationStatus !== 'pending').length} / {activeManifest.stops.length} Stops Serviced ({Math.round((activeManifest.stops.filter((s) => s.verificationStatus && s.verificationStatus !== 'pending').length / Math.max(1, activeManifest.stops.length)) * 100)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-2 rounded-full transition-all duration-500 shadow-sm shadow-emerald-500/50"
+                      style={{
+                        width: `${Math.round((activeManifest.stops.filter((s) => s.verificationStatus && s.verificationStatus !== 'pending').length / Math.max(1, activeManifest.stops.length)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* 2. Collection Stops in exact OR-Tools order */}
                 {activeManifest.stops.map((stop) => {
                   const isCritical = stop.urgencyLevel === 'critical';
                   const seqFormatted = String(stop.sequence).padStart(2, '0');
+                  const isVerified = Boolean(stop.verificationStatus && stop.verificationStatus !== 'pending');
 
                   return (
                     <div
                       key={stop.hotspotId}
-                      className="p-4 rounded-xl bg-command-card border border-command-border space-y-3 hover:border-cyan-500/40 transition-colors shadow-card"
+                      className={`p-4 rounded-xl border space-y-3 transition-colors shadow-card ${
+                        isVerified
+                          ? 'bg-command-card/90 border-emerald-500/40'
+                          : 'bg-command-card border-command-border hover:border-cyan-500/40'
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-7 h-7 rounded-full bg-emerald-950 border-2 border-emerald-400 text-emerald-300 flex items-center justify-center font-mono font-bold text-xs shadow-md">
-                            {seqFormatted}
+                          <div
+                            className={`w-7 h-7 rounded-full border-2 flex items-center justify-center font-mono font-bold text-xs shadow-md ${
+                              stop.verificationStatus === 'collected'
+                                ? 'bg-emerald-950 border-emerald-400 text-emerald-300'
+                                : stop.verificationStatus
+                                ? 'bg-amber-950 border-amber-400 text-amber-300'
+                                : 'bg-slate-900 border-slate-700 text-slate-400'
+                            }`}
+                          >
+                            {stop.verificationStatus === 'collected' ? (
+                              <Check className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              seqFormatted
+                            )}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono text-sm font-bold text-white">
                                 Stop {seqFormatted}: {stop.hotspotId}
                               </span>
                               <Badge variant={isCritical ? 'rose' : 'amber'}>
                                 {stop.urgencyLevel.toUpperCase()} PRIORITY
                               </Badge>
+                              {stop.verificationStatus && (
+                                <Badge
+                                  variant={
+                                    stop.verificationStatus === 'collected'
+                                      ? 'emerald'
+                                      : stop.verificationStatus === 'partially_collected'
+                                      ? 'amber'
+                                      : stop.verificationStatus === 'inaccessible'
+                                      ? 'rose'
+                                      : 'cyan'
+                                  }
+                                >
+                                  {stop.verificationStatus.replace('_', ' ').toUpperCase()}
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-xs text-slate-300 mt-0.5 font-medium">{stop.zoneName}</p>
+                            {stop.verifiedAt && (
+                              <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+                                Verified by {stop.verifiedBy || 'Driver'} at{' '}
+                                {new Date(stop.verifiedAt).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                                {stop.driverNotes && ` — "${stop.driverNotes}"`}
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        <div className="text-right font-mono">
-                          <span className="text-xs text-slate-400 block">AI-Est. Demand</span>
-                          <span className="text-sm font-bold text-emerald-400">{stop.estimatedDemandKg.toLocaleString()} kg</span>
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <div className="text-right font-mono">
+                            <span className="text-xs text-slate-400 block">AI-Est. Demand</span>
+                            <span className="text-sm font-bold text-emerald-400">
+                              {stop.estimatedDemandKg.toLocaleString()} kg
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedStopForVerification(stop);
+                              setIsVerificationModalOpen(true);
+                            }}
+                            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                              isVerified
+                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                                : 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                            }`}
+                          >
+                            <FileCheck2 className="w-3.5 h-3.5" />
+                            {isVerified ? 'Update Sign-Off' : 'Verify Pickup'}
+                          </button>
                         </div>
                       </div>
 
@@ -580,25 +674,77 @@ export default function ManifestsPage() {
                   );
                 })}
 
-                {/* 3. Return Depot */}
-                <div className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-500/40 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-blue-900 border-2 border-blue-400 text-blue-200 flex items-center justify-center font-bold text-xs font-mono shadow-md">
-                      {String(activeManifest.stops.length + 1).padStart(2, '0')}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-bold text-blue-200">
-                          {activeManifest.departureDepotId} (Return & Unload)
-                        </span>
-                        <Badge variant="cyan">Return</Badge>
+                {/* 3. Return Depot & Municipal Weighbridge Scale Terminal */}
+                <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-500/40 space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-full bg-blue-900 border-2 border-blue-400 text-blue-200 flex items-center justify-center font-bold text-xs font-mono shadow-md">
+                        {String(activeManifest.stops.length + 1).padStart(2, '0')}
                       </div>
-                      <p className="text-xs text-slate-300 mt-0.5">{activeManifest.departureDepotName}</p>
-                      <span className="text-[10px] font-mono text-emerald-400 block mt-0.5">
-                        Total Unload: {activeManifest.estimatedLoadKg.toLocaleString()} kg • Return Scheduled: {activeManifest.estimatedReturnTime}
-                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-bold text-blue-200">
+                            {activeManifest.departureDepotId} (Return, Unload & Scale Verification)
+                          </span>
+                          <Badge variant="cyan">Depot Hub</Badge>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-0.5">{activeManifest.departureDepotName}</p>
+                        <span className="text-[10px] font-mono text-emerald-400 block mt-0.5">
+                          Estimated Return: {activeManifest.estimatedReturnTime} • Expected Unload: {activeManifest.estimatedLoadKg.toLocaleString()} kg
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      {!activeWeighbridgeTicket ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsWeighbridgeModalOpen(true)}
+                          className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-cyan-950/60 transition-colors"
+                        >
+                          <Scale className="w-4 h-4" />
+                          Record Weighbridge Check-In
+                        </button>
+                      ) : (
+                        <Badge variant="emerald">Scale Certified</Badge>
+                      )}
                     </div>
                   </div>
+
+                  {/* Certified Weighbridge Slip Summary if ticket exists */}
+                  {activeWeighbridgeTicket && (
+                    <div className="p-3 bg-command-dark/80 border border-emerald-500/30 rounded-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="p-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-400">
+                          <Scale className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-200 block">
+                            Weighbridge Ticket #{activeWeighbridgeTicket.ticketId}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Certified by {activeWeighbridgeTicket.operatorName} • Net Payload: <strong className="text-emerald-300">{activeWeighbridgeTicket.netPayloadKg.toLocaleString()} kg</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 font-mono">
+                        <span className="text-slate-400 text-[11px]">Variance:</span>
+                        <Badge
+                          variant={
+                            activeWeighbridgeTicket.alertLevel === 'severe_overload'
+                              ? 'rose'
+                              : Math.abs(activeWeighbridgeTicket.variancePercentage) > 20
+                              ? 'amber'
+                              : 'emerald'
+                          }
+                        >
+                          {activeWeighbridgeTicket.variancePercentage > 0 ? '+' : ''}
+                          {activeWeighbridgeTicket.variancePercentage}%
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -662,6 +808,32 @@ export default function ManifestsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Pickup Verification Modal */}
+      {activeManifest && (
+        <PickupVerificationModal
+          isOpen={isVerificationModalOpen}
+          onClose={() => {
+            setIsVerificationModalOpen(false);
+            setSelectedStopForVerification(null);
+          }}
+          manifestId={activeManifest.manifestId}
+          stop={selectedStopForVerification}
+          driverName={activeManifest.driverName}
+          onVerify={verifyStopPickup}
+        />
+      )}
+
+      {/* Depot Weighbridge Terminal Modal */}
+      {activeManifest && (
+        <WeighbridgeModal
+          isOpen={isWeighbridgeModalOpen}
+          onClose={() => setIsWeighbridgeModalOpen(false)}
+          manifest={activeManifest}
+          vehicle={assignedVehicle}
+          onRecordTicket={recordWeighbridgeTicket}
+        />
       )}
     </div>
   );

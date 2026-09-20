@@ -434,6 +434,12 @@ export interface ManifestStop {
   urgencyLevel: HotspotUrgency;
   recommendedAction: string;
   safetyDirectives: string[];
+  /** Phase 6D: Driver Pickup Verification Fields */
+  verificationStatus?: PickupVerificationStatus;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  actualWasteCategory?: WasteCategory;
+  driverNotes?: string;
 }
 
 /**
@@ -471,6 +477,8 @@ export interface DriverManifest {
   isStale?: boolean;
   sourceRouteOptimizedAt?: string;
   stops: ManifestStop[];
+  /** Phase 6D: Weighbridge Scale Integration */
+  weighbridgeTicketId?: string;
 }
 
 /**
@@ -504,6 +512,7 @@ export type OperationalRouteStatus =
   | 'on_hold'
   | 'dispatch_ready'
   | 'dispatched'
+  | 'awaiting_weighbridge'
   | 'completed';
 
 export interface OfficerOverride {
@@ -523,3 +532,57 @@ export interface OfficerOverride {
   createdAt: string;
   status: OfficerOverrideStatus;
 }
+
+/**
+ * Phase 6D: Driver Pickup Verification & Weighbridge Integration Types
+ */
+export type PickupVerificationStatus =
+  | 'pending'
+  | 'collected'
+  | 'partially_collected'
+  | 'inaccessible'
+  | 'already_cleared';
+
+export interface PickupVerification {
+  verificationId: string;
+  manifestId: string;
+  routeId: string;
+  hotspotId: string;
+  stopIndex: number;
+  verifiedByDriverName: string;
+  timestamp: string;
+  status: PickupVerificationStatus;
+  actualWasteCategory: WasteCategory;
+  actualEstimatedKg?: number;
+  driverNotes?: string;
+  resolvedReportIds: string[];
+}
+
+export type WeighbridgeAlertLevel =
+  | 'normal'
+  | 'underweight_flag'
+  | 'overweight_flag'
+  | 'severe_overload';
+
+export interface WeighbridgeTicket {
+  ticketId: string;
+  vehicleId: string;
+  routeId: string;
+  manifestId: string;
+  depotId: string;
+  depotName: string;
+  driverName: string;
+  operatorName: string;
+  grossWeightKg: number;
+  tareWeightKg: number;
+  netPayloadKg: number;
+  estimatedDemandKg: number;
+  varianceKg: number;
+  variancePercentage: number;
+  alertLevel: WeighbridgeAlertLevel;
+  disposalFacility: string;
+  weighedAt: string;
+  status: 'completed' | 'flagged_for_audit';
+  notes?: string;
+}
+
