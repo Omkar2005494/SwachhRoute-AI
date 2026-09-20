@@ -16,7 +16,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { WasteReport, ComplaintAnalysis } from '@/types';
-import { formatCategoryLabel, formatHazardLabel, formatMachineryLabel } from '@/lib/formatters';
+import { formatCategoryLabel, formatHazardLabel, formatMachineryLabel, formatTime } from '@/lib/formatters';
 import { Badge } from '@/components/ui/Badge';
 
 interface AIIntelligenceModalProps {
@@ -258,8 +258,8 @@ export function AIIntelligenceModal({
 
           {/* Disclaimer Footer */}
           <div className="pt-3 border-t border-command-border text-[11px] font-mono text-slate-500 flex items-center justify-between">
-            <span>
-              Analysis Time: {analysis?.analyzedAt ? new Date(analysis.analyzedAt).toLocaleTimeString() : 'N/A'}
+            <span suppressHydrationWarning>
+              Analysis Time: {analysis?.analyzedAt ? formatTime(analysis.analyzedAt) : 'N/A'}
             </span>
 
             {onReanalyze && report.id && (

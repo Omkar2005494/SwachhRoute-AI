@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useReports } from '@/lib/reportsContext';
-import { formatCategoryLabel, formatHazardLabel, formatMachineryLabel } from '@/lib/formatters';
+import { formatCategoryLabel, formatHazardLabel, formatMachineryLabel, formatDateTime } from '@/lib/formatters';
 import { MapFoundation } from '@/components/map/MapContainer';
 import {
   ClipboardList,
@@ -213,7 +213,8 @@ export default function ManifestsPage() {
                   <span className="font-mono text-cyan-300">{activeManifest.manifestId}</span>
                 </h1>
                 <p className="text-xs text-slate-400 font-mono mt-0.5">
-                  Linked Route: <strong className="text-slate-200">{activeManifest.routeId}</strong> • Generated: {new Date(activeManifest.generatedAt).toLocaleDateString()} {new Date(activeManifest.generatedAt).toLocaleTimeString()}
+                  Linked Route: <strong className="text-slate-200">{activeManifest.routeId}</strong> • Generated:{' '}
+                  <span suppressHydrationWarning>{formatDateTime(activeManifest.generatedAt)}</span>
                 </p>
               </div>
 

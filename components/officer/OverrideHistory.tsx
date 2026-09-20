@@ -128,7 +128,7 @@ export function OverrideHistory({ overrides }: OverrideHistoryProps) {
               return (
                 <tr key={ovr.overrideId} className="hover:bg-slate-800/40 transition-colors">
                   <td className="py-3 px-4 whitespace-nowrap">
-                    <div className="text-slate-200 font-bold">{formattedDate}</div>
+                    <div className="text-slate-200 font-bold" suppressHydrationWarning>{formattedDate}</div>
                     <div className="text-[10px] text-slate-500 font-mono">{ovr.overrideId}</div>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">

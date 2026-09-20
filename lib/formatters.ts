@@ -81,3 +81,39 @@ export function formatMachineryLabel(m?: MachineryType | string): string {
       return m.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 }
+
+/**
+ * Deterministically formats an ISO date/time into HH:MM (24-hour).
+ */
+export function formatTime(dateInput?: string | Date | number): string {
+  if (!dateInput) return 'N/A';
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return 'N/A';
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  } catch {
+    return 'N/A';
+  }
+}
+
+/**
+ * Deterministically formats an ISO date/time into "Mon DD, HH:MM".
+ */
+export function formatDateTime(dateInput?: string | Date | number): string {
+  if (!dateInput) return 'N/A';
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return 'N/A';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const day = d.getDate().toString().padStart(2, '0');
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    return `${month} ${day}, ${hours}:${minutes}`;
+  } catch {
+    return 'N/A';
+  }
+}
+

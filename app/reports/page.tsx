@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useReports } from '@/lib/reportsContext';
 import { WasteCategory, WasteReport } from '@/types';
-import { formatCategoryLabel } from '@/lib/formatters';
+import { formatCategoryLabel, formatDateTime } from '@/lib/formatters';
 import { CreateReportModal } from '@/components/reports/CreateReportModal';
 import { AIIntelligenceModal } from '@/components/reports/AIIntelligenceModal';
 import {
@@ -167,15 +167,8 @@ export default function ReportsPage() {
                     <td className="px-4 py-3.5 text-slate-400 font-sans whitespace-nowrap">
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-slate-500 shrink-0" />
-                        <span>
-                          {new Date(report.timestamp).toLocaleDateString([], {
-                            month: 'short',
-                            day: 'numeric',
-                          })}{' '}
-                          {new Date(report.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                        <span suppressHydrationWarning>
+                          {formatDateTime(report.timestamp)}
                         </span>
                       </div>
                     </td>

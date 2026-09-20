@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { WasteReport } from '@/types';
-import { formatCategoryLabel } from '@/lib/formatters';
+import { formatCategoryLabel, formatTime } from '@/lib/formatters';
 import { FileText, ArrowUpRight, Clock, MapPin, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
@@ -73,7 +73,7 @@ export function RecentReports({ reports }: RecentReportsProps) {
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3 text-slate-500" />
-                <span>{new Date(report.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span suppressHydrationWarning>{formatTime(report.timestamp)}</span>
               </div>
             </div>
           </div>
