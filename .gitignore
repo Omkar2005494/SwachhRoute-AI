@@ -1,7 +1,11 @@
-__pycache__/
-*.py[cod]
-*$py.class
+node_modules/
+.next/
+out/
+build/
 .DS_Store
 *.log
-venv/
+__pycache__/
+*.py[cod]
 .env
+.env*.local
+*.tsbuildinfo
