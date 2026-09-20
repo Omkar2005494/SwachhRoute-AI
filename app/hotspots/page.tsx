@@ -29,6 +29,8 @@ export default function HotspotsPage() {
     triggerClustering,
     routes,
     getManifestForRoute,
+    activeDataset,
+    activeDepot,
   } = useReports();
 
   const totalClusteredWaste = hotspots.reduce(
@@ -144,6 +146,9 @@ export default function HotspotsPage() {
         <MapFoundation
           reports={reports}
           hotspots={hotspots}
+          center={activeDataset.defaultCenter}
+          zoom={activeDataset.defaultZoom}
+          depot={activeDepot}
           heightClass="h-[440px]"
           activeClusterEngine={geospatialEngine}
         />

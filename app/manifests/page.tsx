@@ -45,6 +45,8 @@ export default function ManifestsPage() {
     verifyStopPickup,
     recordWeighbridgeTicket,
     getRouteWeighbridgeTicket,
+    activeDataset,
+    activeDepot,
   } = useReports();
 
   // If manifests exist, select first by default or allow switching
@@ -467,7 +469,10 @@ export default function ManifestsPage() {
                   reports={[]}
                   hotspots={hotspots}
                   fleet={fleet}
-                  routes={routes}
+                  routes={activeManifest ? routes.filter((r) => r.id === activeManifest.routeId) : routes}
+                  center={activeDataset.defaultCenter}
+                  zoom={activeDataset.defaultZoom}
+                  depot={activeDepot}
                   heightClass="h-[320px]"
                 />
               </div>

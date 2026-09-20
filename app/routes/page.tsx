@@ -43,6 +43,8 @@ export default function RoutesPage() {
     generateManifest,
     regenerateManifest,
     getManifestForRoute,
+    activeDataset,
+    activeDepot,
   } = useReports();
 
   const [isRecalculatingRoad, setIsRecalculatingRoad] = useState(false);
@@ -285,9 +287,9 @@ export default function RoutesPage() {
         <div className="flex items-center justify-between text-xs font-mono">
           <span className="text-slate-400 flex items-center gap-1.5">
             <Navigation className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Map Preview • Depot Loop: Corporation Square ⟷ Collection Stops</span>
+            <span>Map Preview • Depot Loop: {activeDepot.name} ⟷ Collection Stops</span>
           </span>
-          <span className="text-slate-500">Origin: DEPOT-BLR-01 (EPSG:4326)</span>
+          <span className="text-slate-500">Origin: {activeDepot.id} (EPSG:4326)</span>
         </div>
 
         <MapFoundation
@@ -295,6 +297,9 @@ export default function RoutesPage() {
           hotspots={hotspots}
           fleet={fleet}
           routes={routes}
+          center={activeDataset.defaultCenter}
+          zoom={activeDataset.defaultZoom}
+          depot={activeDepot}
           heightClass="h-[420px]"
         />
       </div>

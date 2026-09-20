@@ -145,7 +145,7 @@ interface ReportsContextType {
   getRouteWeighbridgeTicket: (routeId: string) => WeighbridgeTicket | undefined;
 }
 
-const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
+export const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_METADATA_KEY = 'swachhroute_reports_meta_v1';
 

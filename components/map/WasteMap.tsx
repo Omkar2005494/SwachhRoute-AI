@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { WasteReport, Hotspot, FleetVehicle, OptimizedRoute, MunicipalDepot } from '@/types';
 import { DEMONSTRATION_DEPOT } from '@/data/demo';
+import { ReportsContext } from '@/lib/reportsContext';
 import { formatCategoryLabel, formatHazardLabel, formatMachineryLabel } from '@/lib/formatters';
 import { Layers, Eye, EyeOff, MapPin, Truck, Flame, Navigation, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
@@ -68,11 +69,95 @@ const depotIcon = L.divIcon({
   popupAnchor: [0, -16],
 });
 
-function MapViewController({ center, zoom }: { center: [number, number]; zoom: number }) {
+function MapViewController({
+  center,
+  zoom,
+  routes = [],
+  hotspots = [],
+  depotCoordinates,
+}: {
+  center: [number, number];
+  zoom: number;
+  routes?: OptimizedRoute[];
+  hotspots?: Hotspot[];
+  depotCoordinates?: [number, number];
+}) {
   const map = useMap();
+
   useEffect(() => {
+    // Invalidate map size after brief delay to prevent render glitches
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  const routesSignature = routes
+    .map((r) => `${r.id}:${r.stops.length}:${r.roadGeometry?.length || 0}`)
+    .join('|');
+  const hotspotsSignature = hotspots
+    .map((h) => `${h.id}:${h.centerCoordinates[0].toFixed(4)},${h.centerCoordinates[1].toFixed(4)}`)
+    .join('|');
+  const depotSignature = depotCoordinates
+    ? `${depotCoordinates[0].toFixed(4)},${depotCoordinates[1].toFixed(4)}`
+    : '';
+
+  useEffect(() => {
+    // 1. If routes with stops exist, compute bounding box to fit depot + all stops
+    if (routes.length > 0) {
+      const points: [number, number][] = [];
+      if (depotCoordinates) {
+        points.push(depotCoordinates);
+      }
+      for (const r of routes) {
+        if (r.stops) {
+          for (const s of r.stops) {
+            if (s.location && s.location.length === 2) {
+              points.push(s.location);
+            }
+          }
+        }
+        if (r.roadGeometry && r.roadGeometry.length > 0) {
+          points.push(r.roadGeometry[0]);
+          points.push(r.roadGeometry[Math.floor(r.roadGeometry.length / 2)]);
+          points.push(r.roadGeometry[r.roadGeometry.length - 1]);
+        }
+      }
+
+      if (points.length >= 2) {
+        const bounds = L.latLngBounds(points.map((p) => L.latLng(p[0], p[1])));
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, animate: true });
+          return;
+        }
+      }
+    }
+
+    // 2. If hotspots exist and no routes, compute bounding box for depot + hotspots
+    if (hotspots.length > 0 && routes.length === 0) {
+      const points: [number, number][] = [];
+      if (depotCoordinates) {
+        points.push(depotCoordinates);
+      }
+      for (const h of hotspots) {
+        if (h.centerCoordinates && h.centerCoordinates.length === 2) {
+          points.push(h.centerCoordinates);
+        }
+      }
+
+      if (points.length >= 2) {
+        const bounds = L.latLngBounds(points.map((p) => L.latLng(p[0], p[1])));
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, animate: true });
+          return;
+        }
+      }
+    }
+
+    // 3. Fallback: flyTo the explicit/effective center and zoom
     map.flyTo(center, zoom, { duration: 1.2 });
-  }, [center[0], center[1], zoom, map]);
+  }, [center[0], center[1], zoom, routesSignature, hotspotsSignature, depotSignature, map]);
+
   return null;
 }
 
@@ -94,13 +179,20 @@ export default function WasteMap({
   fleet = [],
   routes = [],
   center,
-  zoom = 12,
+  zoom,
   heightClass = 'h-[520px]',
   activeClusterEngine = 'Python / Scikit-learn DBSCAN',
   depot,
 }: WasteMapProps) {
-  const effectiveDepot = depot || DEMONSTRATION_DEPOT;
-  const effectiveCenter: [number, number] = center || effectiveDepot.coordinates;
+  const reportsContext = useContext(ReportsContext);
+  const activeDepot = reportsContext?.activeDepot;
+  const activeDataset = reportsContext?.activeDataset;
+
+  const effectiveDepot = depot || activeDepot || DEMONSTRATION_DEPOT;
+  const effectiveCenter: [number, number] =
+    center || (activeDataset ? activeDataset.defaultCenter : effectiveDepot.coordinates);
+  const effectiveZoom: number =
+    zoom !== undefined ? zoom : (activeDataset ? activeDataset.defaultZoom : 12);
 
   const [showReports, setShowReports] = useState(true);
   const [showHotspots, setShowHotspots] = useState(true);
@@ -193,12 +285,19 @@ export default function WasteMap({
 
       {/* Leaflet Map */}
       <MapContainer
+        key={effectiveDepot.id}
         center={effectiveCenter}
-        zoom={zoom}
+        zoom={effectiveZoom}
         scrollWheelZoom={true}
         className="w-full h-full"
       >
-        <MapViewController center={effectiveCenter} zoom={zoom} />
+        <MapViewController
+          center={effectiveCenter}
+          zoom={effectiveZoom}
+          routes={routes}
+          hotspots={hotspots}
+          depotCoordinates={effectiveDepot.coordinates}
+        />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
