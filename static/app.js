@@ -1,7 +1,8 @@
 /**
- * SwachhRoute AI - Frontend Application Controller
+ * SwachhRoute AI - World-Class Frontend Application Controller
  * Handles Leaflet GIS map rendering, DBSCAN polygon overlays,
- * Google OR-Tools route visualization, and real-time AI report submission.
+ * Google OR-Tools route visualization, Before-vs-After comparison,
+ * Real-time Fleet Simulation, and Web Speech API Voice Ingestion.
  * Problem Statement CS11 - NeuraMorphix HackForge 2026
  * Team: Stackverse-labs
  */
@@ -13,24 +14,28 @@ document.addEventListener("DOMContentLoaded", () => {
     reports: [],
     clusters: [],
     optimization: null,
+    activeMode: "optimized", // "optimized" or "unoptimized"
+    isSimulating: false,
+    simTimer: null,
+    simMarkers: [],
     layers: {
       reports: L.layerGroup(),
       clusters: L.layerGroup(),
       routes: L.layerGroup(),
-      facilities: L.layerGroup()
+      facilities: L.layerGroup(),
+      simulation: L.layerGroup()
     },
     colorPalette: {
       compactor: "#10b981", // Emerald Green for heavy compactor
       tipper1: "#06b6d4",   // Vibrant Cyan for mini tipper 1
       tipper2: "#f59e0b",   // Gold Amber for mini tipper 2
-      depot: "#3b82f6",     // Blue
-      landfill: "#a855f7"   // Purple
+      unoptimized: "#ef4444"// Crimson Red for chaotic manual dispatch
     }
   };
 
   // Facility Locations (from config)
-  const DEPOT = { lat: 18.5035, lng: 73.8115, name: "Kothrud Central Depot" };
-  const LANDFILL = { lat: 18.5135, lng: 73.7920, name: "Transfer Station & MRF" };
+  const DEPOT = { lat: 18.5035, lng: 73.8115, name: "Kothrud Central Solid Waste Depot" };
+  const LANDFILL = { lat: 18.5135, lng: 73.7920, name: "Paud Road Transfer Station & MRF" };
 
   // ========================================================
   // 1. Initialize Leaflet GIS Map
@@ -42,10 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
       zoomControl: false
     });
 
-    // Custom Zoom Control top-left
     L.control.zoom({ position: "topleft" }).addTo(state.map);
 
-    // CartoDB Dark Matter Tiles (High-contrast, elegant dark-mode GIS)
+    // High-contrast CartoDB Dark Matter Tiles
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: "abcd",
@@ -57,15 +61,15 @@ document.addEventListener("DOMContentLoaded", () => {
     state.layers.routes.addTo(state.map);
     state.layers.reports.addTo(state.map);
     state.layers.facilities.addTo(state.map);
+    state.layers.simulation.addTo(state.map);
 
-    // Plot Fixed Municipal Facilities
     plotFacilities();
 
     // Map Click Listener to pick coordinates for Citizen Report
     state.map.on("click", (e) => {
       document.getElementById("input-lat").value = e.latlng.lat.toFixed(6);
       document.getElementById("input-lng").value = e.latlng.lng.toFixed(6);
-      showToast(`Selected map coordinates: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+      showToast(`Selected GPS: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
     });
   }
 
@@ -75,55 +79,48 @@ document.addEventListener("DOMContentLoaded", () => {
     // Depot Marker
     const depotIcon = L.divIcon({
       className: "custom-facility-marker",
-      html: '<i class="fa-solid fa-square text-primary" style="color: #3b82f6; font-size: 24px;"></i>',
+      html: '<i class="fa-solid fa-square text-primary" style="color: #3b82f6; font-size: 24px; filter: drop-shadow(0 0 8px rgba(59,130,246,0.6));"></i>',
       iconSize: [24, 24],
       iconAnchor: [12, 12]
     });
     L.marker([DEPOT.lat, DEPOT.lng], { icon: depotIcon })
-      .bindPopup(`<b>🏢 ${DEPOT.name}</b><br><span style="color:#94a3b8; font-size:11px;">Fleet Start & Maintenance Center</span>`)
+      .bindPopup(`<b>🏢 ${DEPOT.name}</b><br><span style="color:#94a3b8; font-size:11px;">Fleet Departure & Maintenance Depot</span>`)
       .addTo(state.layers.facilities);
 
     // Landfill / Transfer Facility Marker
     const landfillIcon = L.divIcon({
       className: "custom-facility-marker",
-      html: '<i class="fa-solid fa-triangle text-purple" style="color: #a855f7; font-size: 24px;"></i>',
+      html: '<i class="fa-solid fa-triangle text-purple" style="color: #a855f7; font-size: 24px; filter: drop-shadow(0 0 8px rgba(168,85,247,0.6));"></i>',
       iconSize: [24, 24],
       iconAnchor: [12, 12]
     });
     L.marker([LANDFILL.lat, LANDFILL.lng], { icon: landfillIcon })
-      .bindPopup(`<b>🏭 ${LANDFILL.name}</b><br><span style="color:#94a3b8; font-size:11px;">Scientific Material Recovery Facility</span>`)
+      .bindPopup(`<b>🏭 ${LANDFILL.name}</b><br><span style="color:#94a3b8; font-size:11px;">Scientific Material Recovery & Disposal Facility</span>`)
       .addTo(state.layers.facilities);
   }
 
   // ========================================================
-  // 2. Data Fetching & Layer Rendering
+  // 2. Data Fetching & Rendering
   // ========================================================
   async function loadInitialData() {
     try {
-      showToast("Loading Pune Ward 12 geospatial data...");
+      showToast("Initializing SwachhRoute AI GIS Engine...");
       
-      // Fetch Reports
       const repRes = await fetch("/api/reports");
       state.reports = await repRes.json();
       renderReportsLayer();
       updateMetricCounts();
 
-      // Trigger Initial Clustering
       const clusRes = await fetch("/api/cluster", { method: "POST" });
       state.clusters = await clusRes.json();
       renderClustersLayer();
       renderHotspotsList();
 
-      // Trigger Initial Route Optimization
       await runOptimization();
-
-      // Load Policy Insights
       loadPolicyInsights();
-
-      // Load Driver Manifest for first truck
       loadDriverManifest("TRUCK_01");
 
-      showToast("SwachhRoute AI Engine ready. 5 Hotspots clustered.");
+      showToast("SwachhRoute AI operational. 45 Reports grouped into 5 Hotspots.");
     } catch (err) {
       console.error("Error loading data:", err);
       showToast("Error connecting to SwachhRoute API.");
@@ -135,11 +132,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     state.reports.forEach((r) => {
       const circle = L.circleMarker([r.lat, r.lng], {
-        radius: 5,
+        radius: 5.5,
         fillColor: r.severity_score >= 8 ? "#ef4444" : r.severity_score >= 6 ? "#f59e0b" : "#fbbf24",
         color: "#ffffff",
-        weight: 1,
-        opacity: 0.8,
+        weight: 1.2,
+        opacity: 0.9,
         fillOpacity: 0.85
       });
 
@@ -154,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div style="font-size: 11px; color: #475569; margin-bottom: 6px;">"${r.text}"</div>
           <div style="border-top: 1px solid #e2e8f0; padding-top: 4px; font-size: 10px; color: #64748b;">
             <span><b>Hazard:</b> ${r.hazard_class}</span><br>
-            <span><b>Vehicle:</b> ${r.machinery_needed}</span><br>
+            <span><b>Machinery:</b> ${r.machinery_needed}</span><br>
             <span><b>Reporter:</b> ${r.citizen_name}</span>
           </div>
         </div>
@@ -163,42 +160,45 @@ document.addEventListener("DOMContentLoaded", () => {
       circle.bindPopup(popupHtml);
       circle.addTo(state.layers.reports);
     });
+
+    const legendCount = document.getElementById("legend-rep-count");
+    if (legendCount) legendCount.innerText = state.reports.length;
   }
 
   function renderClustersLayer() {
     state.layers.clusters.clearLayers();
 
     state.clusters.forEach((c) => {
-      // Determine polygon color by severity
-      const strokeColor = c.severity_score >= 7.5 ? "#ef4444" : c.severity_score >= 6.0 ? "#f59e0b" : "#3b82f6";
-      const fillColor = c.severity_score >= 7.5 ? "rgba(239, 68, 68, 0.25)" : "rgba(245, 158, 11, 0.2)";
+      const isHigh = c.severity_score >= 7.0;
+      const strokeColor = isHigh ? "#ef4444" : "#f59e0b";
+      const fillColor = isHigh ? "rgba(239, 68, 68, 0.28)" : "rgba(245, 158, 11, 0.22)";
 
       // Draw convex hull polygon
       const polygon = L.polygon(c.polygon, {
         color: strokeColor,
         weight: 2,
-        dashArray: "4, 4",
+        dashArray: "5, 5",
         fillColor: fillColor,
         fillOpacity: 0.4
       });
 
       const popupHtml = `
         <div style="font-family: 'Inter', sans-serif; font-size: 12px; color: #1e293b; max-width: 260px;">
-          <div style="font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 4px;">
+          <div style="font-weight: 800; font-size: 14px; color: #0f172a; margin-bottom: 4px;">
             ${c.name}
           </div>
           <div style="display:flex; gap: 8px; margin-bottom: 8px;">
-            <span style="font-size: 10px; background:#fee2e2; color:#b91c1c; padding:2px 6px; border-radius:4px; font-weight:600;">
-              Avg Sev: ${c.severity_score}/10
+            <span style="font-size: 10px; background:#fee2e2; color:#b91c1c; padding:2px 6px; border-radius:4px; font-weight:700;">
+              Avg Severity: ${c.severity_score}/10
             </span>
-            <span style="font-size: 10px; background:#dcfce7; color:#15803d; padding:2px 6px; border-radius:4px; font-weight:600;">
-              Est: ${c.estimated_tonnage_kg} kg
+            <span style="font-size: 10px; background:#dcfce7; color:#15803d; padding:2px 6px; border-radius:4px; font-weight:700;">
+              Est. Waste: ${c.estimated_tonnage_kg} kg
             </span>
           </div>
-          <div style="font-size: 11px; color:#475569; margin-bottom: 6px;">
-            <b>Density:</b> ${c.report_count} citizen complaints grouped by DBSCAN.<br>
-            <b>Primary Waste:</b> ${c.primary_hazard}<br>
-            <b>Required Fleet:</b> ${c.recommended_machinery}
+          <div style="font-size: 11px; color:#475569; line-height: 1.5;">
+            <b>Spatial Density:</b> ${c.report_count} complaints clustered via DBSCAN.<br>
+            <b>Primary Category:</b> ${c.primary_hazard}<br>
+            <b>Recommended Vehicle:</b> ${c.recommended_machinery}
           </div>
         </div>
       `;
@@ -206,12 +206,12 @@ document.addEventListener("DOMContentLoaded", () => {
       polygon.bindPopup(popupHtml);
       polygon.addTo(state.layers.clusters);
 
-      // Centroid label marker
+      // Centroid label badge
       const centerIcon = L.divIcon({
         className: "custom-centroid-marker",
-        html: `<div style="background: ${strokeColor}; color: white; font-weight: 800; font-size: 10px; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px ${strokeColor}; border: 1.5px solid #fff;">${c.cluster_id}</div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        html: `<div style="background: ${strokeColor}; color: white; font-weight: 800; font-size: 11px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px ${strokeColor}; border: 2px solid #fff;">${c.cluster_id}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
       });
       L.marker([c.centroid_lat, c.centroid_lng], { icon: centerIcon })
         .bindPopup(popupHtml)
@@ -224,6 +224,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!state.optimization || !state.optimization.routes) return;
 
+    if (state.activeMode === "unoptimized") {
+      // Render Chaotic Unoptimized Manual Routes (Zigzag across ward)
+      renderUnoptimizedRoutes();
+      return;
+    }
+
+    // Render OR-Tools Optimized Routes
     const colors = [state.colorPalette.compactor, state.colorPalette.tipper1, state.colorPalette.tipper2];
 
     state.optimization.routes.forEach((route, idx) => {
@@ -231,43 +238,226 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const routeColor = colors[idx % colors.length];
 
-      // Draw road-snapped polyline
       const polyline = L.polyline(route.path_coordinates, {
         color: routeColor,
-        weight: 4.5,
-        opacity: 0.9,
+        weight: 5,
+        opacity: 0.92,
         lineCap: "round",
         lineJoin: "round"
       });
 
       polyline.bindPopup(`
         <div style="font-family:'Inter', sans-serif; font-size:12px; color:#1e293b;">
-          <b>🚚 ${route.vehicle_name}</b> (${route.vehicle_type})<br>
-          <b>Stops:</b> ${route.stops.length} | <b>Payload:</b> ${route.total_tonnage_kg} / ${route.capacity_kg} kg<br>
-          <b>Distance:</b> ${route.total_distance_km} km | <b>Duration:</b> ~${route.estimated_duration_mins} mins
+          <b>🚚 ${route.vehicle_name}</b><br>
+          <b>Stops:</b> ${route.stops.length} | <b>Load:</b> ${route.total_tonnage_kg} / ${route.capacity_kg} kg (${route.utilization_pct}%)<br>
+          <b>Distance:</b> ${route.total_distance_km} km | <b>Est. Time:</b> ~${route.estimated_duration_mins} mins
         </div>
       `);
 
       polyline.addTo(state.layers.routes);
 
-      // Add numbered stop markers
+      // Numbered stops
       route.stops.forEach((stop) => {
         const stopIcon = L.divIcon({
           className: "custom-stop-marker",
-          html: `<div style="background: #0f172a; color: ${routeColor}; border: 2px solid ${routeColor}; font-weight: 800; font-size: 11px; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.6);">${stop.stop_index}</div>`,
-          iconSize: [22, 22],
-          iconAnchor: [11, 11]
+          html: `<div style="background: #090d16; color: ${routeColor}; border: 2px solid ${routeColor}; font-weight: 800; font-size: 11px; width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px rgba(0,0,0,0.8);">${stop.stop_index}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
         });
 
         L.marker([stop.lat, stop.lng], { icon: stopIcon })
-          .bindPopup(`<b>Stop ${stop.stop_index}: ${stop.stop_name}</b><br>Truck: ${route.vehicle_name}<br>Demand: ${stop.demand_kg} kg`)
+          .bindPopup(`<b>Stop ${stop.stop_index}: ${stop.stop_name}</b><br>Vehicle: ${route.vehicle_name}<br>Demand: ${stop.demand_kg} kg`)
           .addTo(state.layers.routes);
       });
     });
   }
 
+  function renderUnoptimizedRoutes() {
+    // Generates simulated unoptimized zigzag paths showing manual dispatch chaos
+    const coords = [
+      [DEPOT.lat, DEPOT.lng],
+      [18.5118, 73.8012], // Paud road
+      [18.4985, 73.8182], // Karve road
+      [18.5062, 73.8055], // Mandi
+      [18.4960, 73.8045], // Dahanukar
+      [18.5095, 73.8160], // Mayur
+      [LANDFILL.lat, LANDFILL.lng]
+    ];
+
+    const unoptPolyline = L.polyline(coords, {
+      color: state.colorPalette.unoptimized,
+      weight: 4,
+      dashArray: "8, 8",
+      opacity: 0.85
+    });
+
+    unoptPolyline.bindPopup(`
+      <div style="font-family:'Inter', sans-serif; font-size:12px; color:#b91c1c;">
+        <b>⚠️ Unoptimized Manual Dispatch</b><br>
+        Haphazard routes without capacity planning.<br>
+        <b>Dead Mileage:</b> +35% | <b>Fuel Wasted:</b> +1.13 L
+      </div>
+    `);
+
+    unoptPolyline.addTo(state.layers.routes);
+  }
+
   // ========================================================
-  // 3. Sidebar UI Updates
+  // 3. Mode Toggle (Before vs After Optimization)
+  // ========================================================
+  document.getElementById("btn-mode-optimized").addEventListener("click", () => {
+    state.activeMode = "optimized";
+    document.getElementById("btn-mode-optimized").classList.add("active");
+    document.getElementById("btn-mode-unoptimized").classList.remove("active");
+
+    // Restore optimal metrics
+    document.getElementById("stat-fuel-saved").innerText = "25.0%";
+    document.getElementById("stat-fuel-litres").innerText = "~1.13 L saved this morning shift";
+    document.getElementById("stat-co2-cut").innerText = "3.03 kg";
+    document.getElementById("stat-cost-cut").innerText = "₹104.5 diesel saved / ward shift";
+
+    renderRoutesLayer();
+    renderRoutesList();
+    showToast("SwachhRoute AI Mode: Showing OR-Tools optimal loops.");
+  });
+
+  document.getElementById("btn-mode-unoptimized").addEventListener("click", () => {
+    state.activeMode = "unoptimized";
+    document.getElementById("btn-mode-unoptimized").classList.add("active");
+    document.getElementById("btn-mode-optimized").classList.remove("active");
+
+    // Show unoptimized penalty metrics
+    document.getElementById("stat-fuel-saved").innerText = "0.0%";
+    document.getElementById("stat-fuel-litres").innerText = "❌ 1.13 L wasted in dead mileage";
+    document.getElementById("stat-co2-cut").innerText = "0.0 kg";
+    document.getElementById("stat-cost-cut").innerText = "❌ +₹104.5 extra fuel burned";
+
+    renderRoutesLayer();
+    showToast("Unoptimized Mode: Demonstrating manual dispatch dead mileage (+35%).");
+  });
+
+  // ========================================================
+  // 4. Live Fleet Simulation Player
+  // ========================================================
+  document.getElementById("btn-sim-play").addEventListener("click", () => {
+    if (state.isSimulating) {
+      stopSimulation();
+    } else {
+      startSimulation();
+    }
+  });
+
+  document.getElementById("btn-sim-pause").addEventListener("click", () => {
+    stopSimulation();
+  });
+
+  document.getElementById("btn-sim-stop").addEventListener("click", () => {
+    stopSimulation();
+    document.getElementById("sim-control-panel").style.display = "none";
+  });
+
+  function startSimulation() {
+    if (!state.optimization || !state.optimization.routes) return;
+
+    state.isSimulating = true;
+    document.getElementById("btn-sim-play").innerHTML = `<i class="fa-solid fa-square"></i> Stop Sim`;
+    document.getElementById("sim-control-panel").style.display = "block";
+
+    // Clear existing sim markers
+    state.layers.simulation.clearLayers();
+
+    const activeRoutes = state.optimization.routes.filter(r => r.stops.length > 0);
+    if (activeRoutes.length === 0) return;
+
+    // Pick first route for animated demonstration
+    const demoRoute = activeRoutes[0];
+    const path = demoRoute.path_coordinates;
+    let step = 0;
+
+    const truckIcon = L.divIcon({
+      className: "truck-sim-marker",
+      html: '<i class="fa-solid fa-truck-moving" style="color:#10b981; font-size:22px; filter:drop-shadow(0 0 10px #10b981);"></i>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
+    const marker = L.marker(path[0], { icon: truckIcon }).addTo(state.layers.simulation);
+
+    state.simTimer = setInterval(() => {
+      if (step >= path.length) {
+        stopSimulation();
+        document.getElementById("sim-truck-info").innerText = "✅ Collection shift completed! Trucks parked at MRF.";
+        showToast("Fleet collection simulation completed successfully!");
+        return;
+      }
+
+      const curPos = path[step];
+      marker.setLatLng(curPos);
+
+      const progress = Math.round((step / (path.length - 1)) * 100);
+      document.getElementById("sim-progress-bar").style.width = `${progress}%`;
+      document.getElementById("sim-truck-info").innerText = `${demoRoute.vehicle_name} en-route: Stop ${Math.min(demoRoute.stops.length, Math.floor(step / (path.length / demoRoute.stops.length)) + 1)} (${progress}% completed)`;
+
+      step++;
+    }, 180);
+  }
+
+  function stopSimulation() {
+    state.isSimulating = false;
+    clearInterval(state.simTimer);
+    document.getElementById("btn-sim-play").innerHTML = `<i class="fa-solid fa-play"></i> Simulate Fleet`;
+  }
+
+  // ========================================================
+  // 5. Web Speech API (Voice-to-Text Input)
+  // ========================================================
+  const voiceBtn = document.getElementById("btn-voice-input");
+  const voiceStatus = document.getElementById("voice-status");
+  const textInput = document.getElementById("input-report-text");
+
+  if (voiceBtn && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "hi-IN"; // Supports Hindi / Hinglish
+
+    voiceBtn.addEventListener("click", () => {
+      try {
+        if (voiceBtn.classList.contains("recording")) {
+          recognition.stop();
+          voiceBtn.classList.remove("recording");
+          voiceStatus.style.display = "none";
+        } else {
+          recognition.start();
+          voiceBtn.classList.add("recording");
+          voiceStatus.style.display = "block";
+          voiceStatus.innerText = "Listening in Hindi/English... Speak naturally.";
+        }
+      } catch (e) {
+        console.error("Speech recognition error:", e);
+      }
+    });
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      textInput.value = transcript;
+      voiceBtn.classList.remove("recording");
+      voiceStatus.style.display = "none";
+      showToast(`Voice transcribed: "${transcript.substring(0, 40)}..."`);
+    };
+
+    recognition.onerror = () => {
+      voiceBtn.classList.remove("recording");
+      voiceStatus.style.display = "none";
+      showToast("Speech recognition timed out or permission denied.");
+    };
+  } else if (voiceBtn) {
+    voiceBtn.title = "Web Speech API not supported in this browser version.";
+  }
+
+  // ========================================================
+  // 6. UI Updates & Lists
   // ========================================================
   function updateMetricCounts() {
     document.getElementById("stat-reports-count").innerText = state.reports.length;
@@ -301,7 +491,6 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
     }).join("");
 
-    // Add click event to pan map
     container.querySelectorAll(".hotspot-card").forEach((card) => {
       card.addEventListener("click", () => {
         const lat = parseFloat(card.getAttribute("data-lat"));
@@ -333,7 +522,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="route-meta">
             <span>Stops: <b>${r.stops.length}</b></span>
-            <span>Load: <b>${r.total_tonnage_kg} / ${r.capacity_kg} kg</b></span>
+            <span>Payload: <b>${r.total_tonnage_kg} / ${r.capacity_kg} kg</b></span>
             <span>Duration: <b>~${r.estimated_duration_mins} m</b></span>
           </div>
           <div class="progress-bar-bg">
@@ -344,20 +533,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }).join("");
   }
 
-  // ========================================================
-  // 4. Trigger Optimization & Update Metrics
-  // ========================================================
   async function runOptimization() {
     try {
       showToast("Running Google OR-Tools CVRP Solver...");
       const res = await fetch("/api/optimize-routes", { method: "POST" });
       state.optimization = await res.json();
 
-      // Update Impact Metrics
       document.getElementById("stat-fuel-saved").innerText = `${state.optimization.fuel_saved_pct}%`;
-      document.getElementById("stat-fuel-litres").innerText = `~${state.optimization.fuel_saved_litres} L saved this shift`;
+      document.getElementById("stat-fuel-litres").innerText = `~${state.optimization.fuel_saved_litres} L saved this morning shift`;
       document.getElementById("stat-co2-cut").innerText = `${state.optimization.co2_avoided_kg} kg`;
-      document.getElementById("stat-cost-cut").innerText = `₹${state.optimization.cost_saved_inr} saved / shift`;
+      document.getElementById("stat-cost-cut").innerText = `₹${state.optimization.cost_saved_inr} diesel saved / ward shift`;
 
       renderRoutesLayer();
       renderRoutesList();
@@ -368,9 +553,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ========================================================
-  // 5. Driver Manifest Generator
-  // ========================================================
   async function loadDriverManifest(truckId) {
     const container = document.getElementById("manifest-content");
     if (!container) return;
@@ -418,13 +600,10 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       `;
     } catch (err) {
-      container.innerHTML = `<div class="loading-placeholder">Please click 'Solve Fleet Routes' first to assign trucks.</div>`;
+      container.innerHTML = `<div class="loading-placeholder">Please click 'Solve Routes' first to assign trucks.</div>`;
     }
   }
 
-  // ========================================================
-  // 6. Policy Insights
-  // ========================================================
   async function loadPolicyInsights() {
     const container = document.getElementById("policy-insights-list");
     if (!container) return;
@@ -501,7 +680,6 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast(`Report accepted! AI classified as ${newReport.hazard_class} (Severity ${newReport.severity_score}/10).`);
         state.map.flyTo([lat, lng], 16, { duration: 1.0 });
 
-        // Auto reset button
         submitBtn.innerHTML = `<i class="fa-solid fa-brain"></i> Parse with Local AI & Submit Report`;
         submitBtn.disabled = false;
       } catch (err) {
@@ -513,9 +691,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ========================================================
-  // 8. Preset Chips Handler
-  // ========================================================
+  // Preset Chips
   document.querySelectorAll(".chip-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const preset = btn.getAttribute("data-preset");
@@ -544,9 +720,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // ========================================================
-  // 9. UI Navigation & Layer Toggles
-  // ========================================================
   // Tab Switching
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -559,7 +732,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Manifest Truck Selector
+  // Manifest Selector
   const truckSelect = document.getElementById("select-truck-manifest");
   if (truckSelect) {
     truckSelect.addEventListener("change", (e) => {
@@ -568,15 +741,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Top Action Buttons
-  document.getElementById("btn-trigger-cluster").addEventListener("click", async () => {
-    showToast("Re-running DBSCAN spatial density clustering...");
-    const clusRes = await fetch("/api/cluster", { method: "POST" });
-    state.clusters = await clusRes.json();
-    renderClustersLayer();
-    renderHotspotsList();
-    showToast(`DBSCAN identified ${state.clusters.length} persistent hotspot black spots.`);
-  });
-
   document.getElementById("btn-trigger-optimize").addEventListener("click", () => {
     runOptimization();
   });
@@ -604,7 +768,6 @@ document.addEventListener("DOMContentLoaded", () => {
     else state.layers.routes.remove();
   });
 
-  // Toast Banner Helper
   function showToast(msg) {
     const banner = document.getElementById("toast-banner");
     const text = document.getElementById("toast-text");

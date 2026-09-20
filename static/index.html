@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SwachhRoute AI — Municipal Geospatial Intelligence & Dynamic Fleet Optimizer</title>
+  <title>SwachhRoute AI — Municipal Geospatial Intelligence & Autonomous Fleet Optimizer</title>
   
   <!-- Leaflet GIS CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- FontAwesome Icons -->
+  <!-- FontAwesome 6 Pro Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <!-- Modern Typography -->
+  <!-- Google Fonts: Outfit & Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -22,7 +22,7 @@
     <!-- Top Header Navigation Bar -->
     <header class="top-navbar">
       <div class="brand-cluster">
-        <div class="brand-logo">
+        <div class="brand-logo pulse-glow">
           <i class="fa-solid fa-route"></i>
         </div>
         <div>
@@ -30,33 +30,49 @@
             SwachhRoute <span class="ai-badge">AI</span>
           </div>
           <div class="brand-subtitle">
-            Autonomous Hotspot Clustering & Dynamic Fleet Route Optimizer • Pune Ward 12
+            Autonomous Geospatial Clustering & Fleet Routing Engine • Pune Ward 12
           </div>
         </div>
       </div>
 
       <div class="tech-pills">
-        <span class="tech-pill" title="Local Meta Llama 3.2 3B runs on Apple Silicon Metal via Ollama">
-          <i class="fa-solid fa-microchip"></i> Local Llama 3.2 3B (Ollama)
+        <span class="tech-pill pill-ai" title="Local Meta Llama 3.2 3B runs on Apple Silicon Metal via Ollama">
+          <span class="status-indicator live"></span>
+          <i class="fa-solid fa-microchip"></i> Llama 3.2 3B (Ollama)
         </span>
         <span class="tech-pill" title="DBSCAN spatial density clustering algorithm">
-          <i class="fa-solid fa-shapes"></i> DBSCAN Clustering
+          <i class="fa-solid fa-shapes text-cyan"></i> DBSCAN (ε=180m)
         </span>
         <span class="tech-pill" title="Google OR-Tools Capacitated Vehicle Routing Problem solver">
-          <i class="fa-solid fa-truck-ramp-box"></i> Google OR-Tools CVRP
+          <i class="fa-solid fa-truck-ramp-box text-emerald"></i> Google OR-Tools CVRP
         </span>
         <span class="tech-pill privacy-pill" title="100% on-premise execution compliant with Indian DPDP Act 2023">
-          <i class="fa-solid fa-shield-halved"></i> DPDP Compliant
+          <i class="fa-solid fa-shield-halved"></i> DPDP Act Compliant
         </span>
       </div>
 
       <div class="top-actions">
-        <button id="btn-trigger-cluster" class="btn btn-secondary">
-          <i class="fa-solid fa-circle-nodes"></i> Detect Hotspots
+        <!-- Before vs After Mode Switcher -->
+        <div class="mode-switch-wrapper">
+          <span class="switch-label">Mode:</span>
+          <div class="mode-switch-pill" id="mode-toggle">
+            <button class="switch-btn active" id="btn-mode-optimized">
+              <i class="fa-solid fa-bolt"></i> SwachhRoute AI
+            </button>
+            <button class="switch-btn" id="btn-mode-unoptimized">
+              <i class="fa-solid fa-clock-rotate-left"></i> Unoptimized
+            </button>
+          </div>
+        </div>
+
+        <button id="btn-sim-play" class="btn btn-sim" title="Simulate real-time truck collection movement">
+          <i class="fa-solid fa-play"></i> Simulate Fleet
         </button>
-        <button id="btn-trigger-optimize" class="btn btn-primary">
-          <i class="fa-solid fa-bolt"></i> Solve Fleet Routes
+
+        <button id="btn-trigger-optimize" class="btn btn-primary pulse-btn">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Solve Routes
         </button>
+
         <button id="btn-reset-data" class="btn btn-icon" title="Reset to Seed Data">
           <i class="fa-solid fa-rotate-right"></i>
         </button>
@@ -75,7 +91,7 @@
             <i class="fa-solid fa-chart-pie"></i> Overview
           </button>
           <button class="tab-btn" data-tab="tab-report">
-            <i class="fa-solid fa-camera"></i> Citizen Report
+            <i class="fa-solid fa-bullhorn"></i> Citizen Report
           </button>
           <button class="tab-btn" data-tab="tab-manifest">
             <i class="fa-solid fa-clipboard-list"></i> Driver Manifest
@@ -91,24 +107,39 @@
           <!-- Impact Metrics Grid -->
           <div class="metrics-grid">
             <div class="metric-card">
-              <div class="metric-label">Active Reports</div>
-              <div id="stat-reports-count" class="metric-value">45</div>
-              <div class="metric-foot">Crowdsourced citizen reports</div>
+              <div class="metric-top">
+                <span class="metric-label">Active Reports</span>
+                <i class="fa-solid fa-satellite-dish text-dim"></i>
+              </div>
+              <div id="stat-reports-count" class="metric-value counter">45</div>
+              <div class="metric-foot">Crowdsourced citizen complaints</div>
             </div>
+
             <div class="metric-card">
-              <div class="metric-label">Black Spots (DBSCAN)</div>
-              <div id="stat-clusters-count" class="metric-value">5</div>
-              <div class="metric-foot">Persistent chronic clusters</div>
+              <div class="metric-top">
+                <span class="metric-label">Hotspots (DBSCAN)</span>
+                <i class="fa-solid fa-circle-dot text-danger"></i>
+              </div>
+              <div id="stat-clusters-count" class="metric-value counter">5</div>
+              <div class="metric-foot">Persistent chronic black spots</div>
             </div>
+
             <div class="metric-card highlight-metric">
-              <div class="metric-label">Fuel Saved (CVRP)</div>
-              <div id="stat-fuel-saved" class="metric-value">25.0%</div>
-              <div class="metric-foot" id="stat-fuel-litres">~1.13 L saved this shift</div>
+              <div class="metric-top">
+                <span class="metric-label">Fuel Saved (CVRP)</span>
+                <span class="trend-pill"><i class="fa-solid fa-arrow-down"></i> 25.0%</span>
+              </div>
+              <div id="stat-fuel-saved" class="metric-value counter-highlight">25.0%</div>
+              <div class="metric-foot" id="stat-fuel-litres">~1.13 L saved this morning shift</div>
             </div>
+
             <div class="metric-card highlight-metric">
-              <div class="metric-label">CO₂ Emissions Cut</div>
-              <div id="stat-co2-cut" class="metric-value">3.03 kg</div>
-              <div class="metric-foot" id="stat-cost-cut">₹104.5 saved / shift</div>
+              <div class="metric-top">
+                <span class="metric-label">CO₂ Emissions Cut</span>
+                <span class="trend-pill"><i class="fa-solid fa-leaf"></i> Clean</span>
+              </div>
+              <div id="stat-co2-cut" class="metric-value counter-highlight">3.03 kg</div>
+              <div class="metric-foot" id="stat-cost-cut">₹104.5 diesel saved / ward shift</div>
             </div>
           </div>
 
@@ -118,18 +149,16 @@
             <span id="hotspots-badge" class="badge">5 Hotspots</span>
           </div>
           <div id="hotspots-list" class="scroll-list">
-            <!-- Dynamically populated by app.js -->
             <div class="loading-placeholder">Loading hotspot clusters...</div>
           </div>
 
           <!-- Section: Fleet Routes -->
           <div class="section-header" style="margin-top: 18px;">
-            <h3><i class="fa-solid fa-truck text-success"></i> Optimized Vehicle Routes</h3>
+            <h3><i class="fa-solid fa-truck text-success"></i> Dynamic Vehicle Routes</h3>
             <span id="routes-badge" class="badge">3 Vehicles</span>
           </div>
           <div id="routes-list" class="scroll-list">
-            <!-- Dynamically populated by app.js -->
-            <div class="loading-placeholder">Click 'Solve Fleet Routes' to calculate paths...</div>
+            <div class="loading-placeholder">Click 'Solve Routes' to calculate paths...</div>
           </div>
 
         </div>
@@ -137,32 +166,43 @@
         <!-- Tab 2: Citizen Report Portal -->
         <div id="tab-report" class="tab-pane">
           <div class="report-form-container">
-            <h3><i class="fa-solid fa-mobile-screen"></i> Citizen Waste Reporting Portal</h3>
-            <p class="form-desc">
-              Test live unstructured multimodal text ingestion. Click anywhere on the map to place coordinates, or choose a preset case below:
-            </p>
+            <div class="portal-header">
+              <div class="portal-icon"><i class="fa-solid fa-mobile-screen"></i></div>
+              <div>
+                <h3>Citizen Grievance Ingestion</h3>
+                <p class="form-desc">
+                  Simulate crowdsourced inputs with natural language parsing via local Llama 3.2 3B. Click anywhere on the map to set GPS coordinates or test a preset:
+                </p>
+              </div>
+            </div>
 
             <!-- Quick Preset Samples -->
             <div class="preset-chips">
-              <button class="chip-btn" data-preset="mandi">🥬 Rotten Vegetables</button>
-              <button class="chip-btn" data-preset="biomedical">💉 Medical Syringes</button>
-              <button class="chip-btn" data-preset="nullah">🌊 Clogged Nullah</button>
-              <button class="chip-btn" data-preset="malba">🧱 Concrete Malba</button>
+              <button class="chip-btn" data-preset="mandi"><i class="fa-solid fa-carrot"></i> Rotten Vegetables</button>
+              <button class="chip-btn" data-preset="biomedical"><i class="fa-solid fa-syringe"></i> Medical Syringes</button>
+              <button class="chip-btn" data-preset="nullah"><i class="fa-solid fa-water"></i> Clogged Nullah</button>
+              <button class="chip-btn" data-preset="malba"><i class="fa-solid fa-trowel-bricks"></i> Concrete Malba</button>
             </div>
 
             <form id="citizen-report-form">
               <div class="form-group">
-                <label>Citizen Description (Hindi / Marathi / English)</label>
+                <div class="label-row">
+                  <label>Citizen Complaint (Hinglish / Marathi / English)</label>
+                  <button type="button" id="btn-voice-input" class="btn-voice-mic" title="Click to speak your complaint">
+                    <i class="fa-solid fa-microphone"></i> Speak
+                  </button>
+                </div>
                 <textarea id="input-report-text" rows="3" placeholder="e.g. Maruti mandir ke peeche kachra overflow, dead animal smell, drain completely blocked..." required></textarea>
+                <div id="voice-status" class="voice-status-text" style="display:none;">Listening... Speak naturally</div>
               </div>
 
               <div class="form-row">
                 <div class="form-group half">
-                  <label>Latitude</label>
+                  <label><i class="fa-solid fa-location-dot text-primary"></i> Latitude</label>
                   <input type="number" id="input-lat" step="0.000001" value="18.5085" required />
                 </div>
                 <div class="form-group half">
-                  <label>Longitude</label>
+                  <label><i class="fa-solid fa-location-dot text-primary"></i> Longitude</label>
                   <input type="number" id="input-lng" step="0.000001" value="73.8062" required />
                 </div>
               </div>
@@ -187,7 +227,7 @@
             <div id="ai-extraction-card" class="ai-result-box" style="display: none;">
               <div class="ai-header">
                 <i class="fa-solid fa-robot"></i>
-                <span id="ai-engine-label">Meta Llama 3.2 3B Structured Extraction:</span>
+                <span id="ai-engine-label">Local Meta Llama 3.2 3B Structured Extraction:</span>
               </div>
               <div class="ai-tags">
                 <span id="tag-hazard" class="tag tag-hazard">Hazard: -</span>
@@ -204,16 +244,15 @@
         <div id="tab-manifest" class="tab-pane">
           <div class="manifest-container">
             <div class="manifest-selector">
-              <label>Select Truck Dispatch:</label>
+              <label><i class="fa-solid fa-truck"></i> Select Vehicle Trip:</label>
               <select id="select-truck-manifest">
-                <option value="TRUCK_01">Compactor MH-12-Q-4481 (Heavy)</option>
-                <option value="TRUCK_02">Tipper MH-12-RN-8812 (Mini)</option>
-                <option value="TRUCK_03">Tipper MH-12-RN-9023 (Mini)</option>
+                <option value="TRUCK_01">Compactor MH-12-Q-4481 (Hydraulic Heavy)</option>
+                <option value="TRUCK_02">Tipper MH-12-RN-8812 (Mini Tipper)</option>
+                <option value="TRUCK_03">Tipper MH-12-RN-9023 (Mini Tipper)</option>
               </select>
             </div>
 
             <div id="manifest-content" class="manifest-paper">
-              <!-- Dynamically populated -->
               <div class="loading-placeholder">Loading driver manifest...</div>
             </div>
           </div>
@@ -222,12 +261,16 @@
         <!-- Tab 4: Policy Insights -->
         <div id="tab-policy" class="tab-pane">
           <div class="policy-container">
-            <h3><i class="fa-solid fa-file-shield text-warning"></i> Root-Cause Prevention Intelligence</h3>
-            <p class="form-desc">
-              Llama 3.2 3B analyzes chronic recurrence patterns across months and provides actionable municipal policy interventions to eradicate black spots permanently.
-            </p>
-            <div id="policy-insights-list" class="scroll-list">
-              <!-- Dynamically populated -->
+            <div class="portal-header">
+              <div class="portal-icon text-warning"><i class="fa-solid fa-shield-halved"></i></div>
+              <div>
+                <h3>Root-Cause Municipal Policy Alerts</h3>
+                <p class="form-desc">
+                  Llama 3.2 3B evaluates recurrence frequency to diagnose why black spots persist and formulates preventative interventions under SWM Rules 2016.
+                </p>
+              </div>
+            </div>
+            <div id="policy-insights-list" class="scroll-list" style="max-height: 520px;">
               <div class="loading-placeholder">Loading policy insights...</div>
             </div>
           </div>
@@ -239,24 +282,42 @@
       <section class="map-viewport">
         <div id="map"></div>
         
+        <!-- Map Floating Simulation Controls (Hidden by default, shows during playback) -->
+        <div id="sim-control-panel" class="map-sim-panel" style="display: none;">
+          <div class="sim-header">
+            <span><i class="fa-solid fa-truck-moving text-emerald"></i> Fleet Collection Simulation</span>
+            <span id="sim-status-badge" class="sim-badge">Playing 1x</span>
+          </div>
+          <div class="sim-body">
+            <div class="sim-truck-status" id="sim-truck-info">Trucks departing Kothrud Depot...</div>
+            <div class="sim-progress-track">
+              <div id="sim-progress-bar" class="sim-progress-fill"></div>
+            </div>
+            <div class="sim-btns">
+              <button id="btn-sim-pause" class="btn btn-sm btn-secondary"><i class="fa-solid fa-pause"></i> Pause</button>
+              <button id="btn-sim-stop" class="btn btn-sm btn-secondary"><i class="fa-solid fa-stop"></i> Stop</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Map Floating Legend & Controls -->
         <div class="map-overlay-legend">
-          <h4><i class="fa-solid fa-layer-group"></i> Layer Visibility</h4>
+          <h4><i class="fa-solid fa-layer-group"></i> Layer Controls</h4>
           <label class="legend-item">
             <input type="checkbox" id="toggle-reports" checked />
-            <span class="legend-dot dot-report"></span> Raw Citizen Reports (45)
+            <span class="legend-dot dot-report"></span> Citizen Reports (<span id="legend-rep-count">45</span>)
           </label>
           <label class="legend-item">
             <input type="checkbox" id="toggle-clusters" checked />
-            <span class="legend-dot dot-cluster"></span> DBSCAN Hotspot Polygons (5)
+            <span class="legend-dot dot-cluster"></span> DBSCAN Hotspots (5)
           </label>
           <label class="legend-item">
             <input type="checkbox" id="toggle-routes" checked />
-            <span class="legend-dot dot-route"></span> OR-Tools Optimized Routes (3)
+            <span class="legend-dot dot-route"></span> Optimized Routes (3)
           </label>
           <div class="legend-facility">
-            <span><i class="fa-solid fa-square text-primary"></i> Municipal Depot</span>
-            <span><i class="fa-solid fa-triangle text-purple"></i> Transfer Facility</span>
+            <span><i class="fa-solid fa-square" style="color: #3b82f6;"></i> Central Depot</span>
+            <span><i class="fa-solid fa-triangle" style="color: #a855f7;"></i> MRF Facility</span>
           </div>
         </div>
 
