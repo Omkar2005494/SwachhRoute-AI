@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useReports } from '@/lib/reportsContext';
@@ -15,6 +16,7 @@ import {
   ShieldAlert,
   Info,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { MapFoundation } from '@/components/map/MapContainer';
 import { formatCategoryLabel, formatHazardLabel, formatMachineryLabel } from '@/lib/formatters';
@@ -82,6 +84,16 @@ export default function HotspotsPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${isClustering ? 'animate-spin text-cyan-400' : ''}`} />
             <span>{isClustering ? 'Clustering...' : 'Re-Cluster'}</span>
           </button>
+
+          {/* Phase 7 Recurrence & Policy Link */}
+          <Link
+            href="/insights"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-950/80 hover:bg-purple-900 border border-purple-500/50 text-purple-300 hover:text-purple-100 transition-colors text-xs font-mono"
+            title="View Chronic Hotspot Recurrence & Policy Directives"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>Recurrence & Policy Directives</span>
+          </Link>
         </div>
       </div>
 
@@ -188,9 +200,25 @@ export default function HotspotsPage() {
                         Cluster #{hotspot.clusterLabel}
                       </span>
                     </div>
-                    <Badge variant={isCritical ? 'rose' : 'amber'} pulse={isCritical}>
-                      {hotspot.urgencyLevel}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      {hotspot.recurrenceClassification && (
+                        <Badge
+                          variant={
+                            hotspot.recurrenceClassification === 'chronic_dumping'
+                              ? 'rose'
+                              : hotspot.recurrenceClassification === 'emerging_hotspot'
+                              ? 'amber'
+                              : 'emerald'
+                          }
+                          pulse={hotspot.recurrenceClassification === 'chronic_dumping'}
+                        >
+                          {hotspot.recurrenceClassification.replace(/_/g, ' ').toUpperCase()}
+                        </Badge>
+                      )}
+                      <Badge variant={isCritical ? 'rose' : 'amber'} pulse={isCritical}>
+                        {hotspot.urgencyLevel}
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Route Assignment & Manifest Status */}
@@ -335,7 +363,13 @@ export default function HotspotsPage() {
 
                 {/* Card Footer */}
                 <div className="mt-4 pt-3 border-t border-command-border/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Clustered Reports: {hotspot.reportCount || hotspot.reportIds.length}</span>
+                  <Link
+                    href="/insights"
+                    className="text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                  >
+                    <span>Recurrence: {hotspot.recurrenceIndex ?? 65}/100</span>
+                    <span className="text-[10px]">→ Policy Directives</span>
+                  </Link>
                   <span className="text-emerald-400 capitalize">Status: {hotspot.status}</span>
                 </div>
               </Card>

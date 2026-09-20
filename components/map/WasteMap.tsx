@@ -345,6 +345,21 @@ export default function WasteMap({
                   />
                 )}
 
+                {/* Chronic Hotspot Recurrence Halo */}
+                {hotspot.recurrenceClassification === 'chronic_dumping' && (
+                  <CircleMarker
+                    center={hotspot.centerCoordinates}
+                    radius={24}
+                    pathOptions={{
+                      color: '#f43f5e',
+                      fillColor: '#f43f5e',
+                      fillOpacity: 0.15,
+                      weight: 1.5,
+                      dashArray: '3, 4',
+                    }}
+                  />
+                )}
+
                 {/* Hotspot Center Marker */}
                 <Marker
                   position={hotspot.centerCoordinates}
@@ -407,6 +422,15 @@ export default function WasteMap({
                             {hotspot.recommendedMachinery.map(formatMachineryLabel).join(', ')}
                           </span>
                         </div>
+                        {hotspot.recurrenceClassification && (
+                          <div className="flex justify-between items-center pt-1 border-t border-command-border/40 font-mono">
+                            <span className="text-slate-400">Recurrence: </span>
+                            <span className={hotspot.recurrenceClassification === 'chronic_dumping' ? 'text-rose-400 font-bold' : 'text-amber-300 font-semibold'}>
+                              {hotspot.recurrenceClassification.replace(/_/g, ' ').toUpperCase()}
+                              {hotspot.recurrenceIndex !== undefined ? ` (${hotspot.recurrenceIndex}/100)` : ''}
+                            </span>
+                          </div>
+                        )}
                         <div className="pt-1 text-[9px] text-slate-500 font-mono">
                           Boundary: {isOperationalBuffer ? '35m Operational Buffer (Collinear Protection)' : 'Convex Hull Envelope'}
                         </div>

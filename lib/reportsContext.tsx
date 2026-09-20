@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   WasteReport,
   Hotspot,
@@ -27,6 +27,8 @@ import {
   PickupVerificationStatus,
   WeighbridgeTicket,
   WeighbridgeAlertLevel,
+  HotspotRecurrenceProfile,
+  WardRecurrenceAnalytics,
 } from '@/types';
 import { DEMO_REPORTS, DEMO_HOTSPOTS, DEMO_FLEET, DEMO_ROUTES, DEMONSTRATION_DEPOT } from '@/data/demo';
 import {
@@ -47,6 +49,7 @@ import { clusterWasteReports } from '@/services/geospatial';
 import { optimizeFleetRoutes } from '@/services/optimization';
 import { getRoadRoute, clearRoadRoutingCache } from '@/services/routing';
 import { generateDriverManifest } from '@/services/manifests';
+import { analyzeWardRecurrence, buildHotspotRecurrenceProfile } from '@/services/analytics';
 import { isFirebaseConfigured } from '@/lib/firebase/config';
 import {
   isFirestoreAvailable,
@@ -143,6 +146,10 @@ interface ReportsContextType {
   ) => Promise<{ success: boolean; error?: string; ticket?: WeighbridgeTicket }>;
   getManifestVerifications: (manifestId: string) => PickupVerification[];
   getRouteWeighbridgeTicket: (routeId: string) => WeighbridgeTicket | undefined;
+  // Phase 7: Recurrence Tracking & Chronic Dumping Analytics
+  recurrenceProfiles: HotspotRecurrenceProfile[];
+  wardAnalytics: WardRecurrenceAnalytics | null;
+  getRecurrenceProfile: (hotspotId: string) => HotspotRecurrenceProfile | undefined;
 }
 
 export const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
@@ -382,7 +389,16 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await clusterWasteReports(currentReports, { epsMeters: 180, minSamples: 3 });
 
-      setHotspots(result.hotspots);
+      const enrichedHotspots = result.hotspots.map((h) => {
+        const prof = buildHotspotRecurrenceProfile(h, currentReports);
+        return {
+          ...h,
+          recurrenceClassification: prof.classification,
+          recurrenceIndex: prof.recurrenceIndex,
+        };
+      });
+
+      setHotspots(enrichedHotspots);
       setClusteringResult(result);
       setGeospatialEngine(
         result.engine === 'python_scikit_learn'
@@ -1493,6 +1509,34 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
     [weighbridgeTickets]
   );
 
+  // ─── Phase 7: Recurrence Tracking & Chronic Dumping Analytics ───
+  const wardAnalytics = useMemo<WardRecurrenceAnalytics | null>(() => {
+    return analyzeWardRecurrence(
+      activeDataset.wardOrZone || activeDataset.name,
+      hotspots,
+      reports,
+      pickupVerifications
+    );
+  }, [activeDataset.wardOrZone, activeDataset.name, hotspots, reports, pickupVerifications]);
+
+  const recurrenceProfiles = useMemo<HotspotRecurrenceProfile[]>(() => {
+    return hotspots.map((h) => {
+      const isCleared =
+        h.status === 'resolved' ||
+        Object.values(pickupVerifications).some((verifs) =>
+          verifs.some((v) => v.hotspotId === h.id && v.status === 'collected')
+        );
+      return buildHotspotRecurrenceProfile(h, reports, isCleared);
+    });
+  }, [hotspots, reports, pickupVerifications]);
+
+  const getRecurrenceProfile = useCallback(
+    (hotspotId: string): HotspotRecurrenceProfile | undefined => {
+      return recurrenceProfiles.find((p) => p.hotspotId === hotspotId);
+    },
+    [recurrenceProfiles]
+  );
+
   // ─── Real Municipal Dataset Management ──────
   const switchDataset = useCallback(
     async (datasetId: string) => {
@@ -1724,6 +1768,10 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
         recordWeighbridgeTicket,
         getManifestVerifications,
         getRouteWeighbridgeTicket,
+        // Phase 7: Recurrence Tracking & Chronic Dumping Analytics
+        recurrenceProfiles,
+        wardAnalytics,
+        getRecurrenceProfile,
       }}
     >
       {children}

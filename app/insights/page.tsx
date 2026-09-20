@@ -1,49 +1,123 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Sparkles, Terminal, ShieldAlert, Cpu, CheckCircle, Database } from 'lucide-react';
-import { DEMO_DATA_NOTICE } from '@/data/demo';
+import { useReports } from '@/lib/reportsContext';
+import {
+  Sparkles,
+  Terminal,
+  ShieldAlert,
+  Cpu,
+  CheckCircle,
+  Database,
+  Flame,
+  Gavel,
+  RefreshCw,
+  Building,
+  Info,
+} from 'lucide-react';
+import {
+  RecurrenceScoreCard,
+  ChronicRankingTable,
+  PolicyDirectivesPanel,
+  HotspotRecurrenceModal,
+} from '@/components/analytics';
+import { HotspotRecurrenceProfile } from '@/types';
+import { formatCategoryLabel } from '@/lib/formatters';
 
 export default function InsightsPage() {
+  const {
+    wardAnalytics,
+    recurrenceProfiles,
+    activeDataset,
+    activeDepot,
+    reports,
+    hotspots,
+    fleet,
+  } = useReports();
+
+  const [selectedProfile, setSelectedProfile] = useState<HotspotRecurrenceProfile | null>(null);
+
+  // Dynamic Ward Executive Synthesis
+  const totalClusteredWasteTons = (
+    hotspots.reduce((sum, h) => sum + (h.totalEstimatedWasteKg || 0), 0) / 1000
+  ).toFixed(2);
+
+  const chronicCount = wardAnalytics?.chronicHotspotsCount || 0;
+  const topCause = wardAnalytics?.primaryRootCauses[0];
+  const topZone = recurrenceProfiles.length > 0
+    ? [...recurrenceProfiles].sort((a, b) => b.recurrenceIndex - a.recurrenceIndex)[0]
+    : null;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-command-border/60">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-400" />
-            AI Intelligence & Municipal Analytics
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              <span>Municipal Recurrence & Policy Intelligence Console</span>
+            </h2>
+            <Badge variant="purple" className="font-mono">Phase 7</Badge>
+          </div>
           <p className="text-xs text-slate-400 mt-1">
-            Meta Llama 3.2 3B Natural Language Understanding & Strategic Operational Synthesis.
+            Chronic hotspot recurrence velocity, temporal pattern indexing, and statutory preventive directives under SWM Rules 2016.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="cyan" className="font-mono">
+            <Building className="w-3 h-3 mr-1" />
+            {activeDataset.name} ({reports.length} Reports)
+          </Badge>
           <Badge variant="purple" className="font-mono">
-            Ollama: Llama 3.2 3B
+            Ollama: Llama 3.2 3B NLU
           </Badge>
         </div>
       </div>
 
-      {/* Simulated Demonstration Warning Card */}
-      <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-start gap-3 text-xs">
-        <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-        <div>
-          <h4 className="font-bold text-amber-300 uppercase font-mono">{DEMO_DATA_NOTICE}</h4>
-          <p className="text-slate-300 mt-0.5 leading-relaxed">
-            All analytical summaries and hotspot metrics in this interface are generated from synthetic Bengaluru urban demonstration sets. They are structured to validate the 6-stage SwachhRoute AI pipeline for HackForge 2026.
+      {/* Ward Recurrence KPIs */}
+      <RecurrenceScoreCard
+        analytics={wardAnalytics}
+        wardName={activeDataset.wardOrZone || activeDataset.name}
+      />
+
+      {/* Dynamic AI Executive Operational Briefing */}
+      <Card glow="purple">
+        <CardHeader
+          title="Executive Operational & Strategic Briefing"
+          subtitle={`Synthesized for ${activeDataset.name} (${activeDepot.name})`}
+          icon={Terminal}
+        />
+        <div className="p-4 rounded-lg bg-command-surface/80 border border-command-border text-xs text-slate-300 space-y-3 font-sans leading-relaxed">
+          <p>
+            <strong>Sector Telemetry:</strong> In <strong>{activeDataset.name}</strong>, spatial DBSCAN clustering identified <strong>{hotspots.length} high-density waste clusters</strong> containing <strong>{totalClusteredWasteTons} metric tons</strong> of accumulated waste across {reports.length} citizen complaints. <strong>{chronicCount} cluster{chronicCount === 1 ? '' : 's'}</strong> qualify as <strong>Chronic Dumping Sites</strong> with a persistent repeat rate of {wardAnalytics ? Math.round((chronicCount / (hotspots.length || 1)) * 100) : 0}%.
+          </p>
+          <p>
+            <strong>Primary Root Cause:</strong> The dominant recurrence driver is <strong>{topCause ? formatCategoryLabel(topCause.category) : 'Mixed Municipal Waste'}</strong> (accounting for {topCause?.percentage || 0}% of high-velocity clusters). {topZone ? `Zone ${topZone.zoneName} (${topZone.hotspotId}) exhibits the highest recurrence index of ${topZone.recurrenceIndex}/100 with ~${topZone.averageIntervalDays}d between repeat dumping incidents.` : ''}
+          </p>
+          <p>
+            <strong>Statutory Directives:</strong> Deploy immediate dual-shift mechanical dumper placers and solar CCTV monitoring poles at top chronic sites. Transition collection from once-daily to split-schedule to eliminate vendor backlogs under Solid Waste Management Rules 2016.
           </p>
         </div>
-      </div>
+      </Card>
+
+      {/* Chronic Ranking Table */}
+      <ChronicRankingTable
+        profiles={recurrenceProfiles}
+        onSelectProfile={(p) => setSelectedProfile(p)}
+      />
+
+      {/* Statutory Policy & Preventive Directives Panel */}
+      <PolicyDirectivesPanel analytics={wardAnalytics} />
 
       {/* Architecture Separation of Concerns Card */}
       <Card glow="cyan">
         <CardHeader
           title="Strict Separation of Concerns Architecture"
-          subtitle="Rule: Llama 3.2 3B handles ONLY Natural Language Understanding"
+          subtitle="Rule: Llama 3.2 3B handles Natural Language Understanding • Deterministic Algorithms handle Spatial & Math Operations"
           icon={Cpu}
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
@@ -51,55 +125,42 @@ export default function InsightsPage() {
           <div className="p-4 rounded-lg bg-emerald-950/20 border border-emerald-500/30 space-y-2">
             <h4 className="font-bold text-emerald-300 uppercase font-mono flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-400" />
-              Llama 3.2 3B Responsibilities (Permitted)
+              Llama 3.2 3B Responsibilities (Permitted NLU)
             </h4>
             <ul className="space-y-1.5 text-slate-300 list-disc list-inside">
-              <li>Citizen complaint language parsing & intent extraction</li>
-              <li>Hazard interpretation (biohazard, chemical, flammable)</li>
+              <li>Citizen complaint language parsing & multi-lingual Hinglish understanding</li>
+              <li>Hazard extraction (biomedical, chemical, severe odor, drain blockage)</li>
               <li>Severity classification (low, medium, high, critical)</li>
-              <li>Required machinery recommendation (Compactor, JCB, Mini Tipper)</li>
-              <li>Driver shift briefing synthesis</li>
-              <li>Municipal executive summaries</li>
+              <li>Operational summary generation</li>
+              <li>Executive briefing synthesis from verified metrics</li>
             </ul>
           </div>
 
-          {/* What Llama MUST NOT Handle */}
+          {/* What Deterministic Engines Handle */}
           <div className="p-4 rounded-lg bg-rose-950/20 border border-rose-500/30 space-y-2">
             <h4 className="font-bold text-rose-300 uppercase font-mono flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-rose-400" />
-              Deterministic Engines Only (Forbidden for LLM)
+              Deterministic Algorithms (Strict Math & Safety)
             </h4>
             <ul className="space-y-1.5 text-slate-300 list-disc list-inside">
-              <li>EPSG:4326 to EPSG:3857 coordinate projection</li>
-              <li>Geographic distance & Haversine / Euclidean calculations</li>
-              <li>DBSCAN hotspot density clustering (Scikit-learn)</li>
-              <li>Convex hull polygon calculations (SciPy)</li>
-              <li>CVRP route optimization & fleet assignment (Google OR-Tools)</li>
-              <li>Road snapping & turn geometry (OSRM)</li>
+              <li>EPSG:4326 to EPSG:3857 metric coordinate projection</li>
+              <li>DBSCAN hotspot density clustering (Scikit-learn ε=180m, MinPts=3)</li>
+              <li>Google OR-Tools CVRP capacity-constrained fleet route solving</li>
+              <li>OSRM road network snapping & geometry generation</li>
+              <li>Net weighbridge payload & weight variance calculation</li>
+              <li>Multi-factor Recurrence Index calculation & statutory SWM 2016 mapping</li>
             </ul>
           </div>
         </div>
       </Card>
 
-      {/* Mock AI Executive Synthesis Card */}
-      <Card glow="purple">
-        <CardHeader
-          title="Executive Operational Briefing (Synthesized)"
-          subtitle="Generated by Meta Llama 3.2 3B Engine"
-          icon={Terminal}
-        />
-        <div className="p-4 rounded-lg bg-command-surface/80 border border-command-border text-xs text-slate-300 space-y-3 font-sans leading-relaxed">
-          <p>
-            <strong>Operational Status:</strong> Sector telemetry indicates 3 active high-density waste clusters totaling 5.2 metric tons across Indiranagar, Koramangala, and Whitefield corridors.
-          </p>
-          <p>
-            <strong>Machinery Directives:</strong> Indiranagar (Cluster #1) requires heavy loader (JCB) and Ro-Ro deployment to clear concrete and construction debris obstruction. Koramangala (Cluster #2) has critical drain contamination requiring suction tanker operation.
-          </p>
-          <p>
-            <strong>Fleet Recommendation:</strong> Deploy 2 available heavy compactors from Central Municipal Depot immediately to prevent weekend overflow.
-          </p>
-        </div>
-      </Card>
+      {/* Individual Hotspot Recurrence Detail Modal */}
+      <HotspotRecurrenceModal
+        profile={selectedProfile}
+        reports={reports}
+        isOpen={Boolean(selectedProfile)}
+        onClose={() => setSelectedProfile(null)}
+      />
     </div>
   );
 }

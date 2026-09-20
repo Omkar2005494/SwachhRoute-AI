@@ -167,6 +167,9 @@ export interface Hotspot {
   /** Phase 6C: Officer Priority Override */
   officerPriorityOverride?: HotspotUrgency;
   officerOverrideReason?: string;
+  /** Phase 7: Chronic Recurrence Analytics */
+  recurrenceClassification?: RecurrenceClassification;
+  recurrenceIndex?: number;
 }
 
 /**
@@ -584,5 +587,80 @@ export interface WeighbridgeTicket {
   weighedAt: string;
   status: 'completed' | 'flagged_for_audit';
   notes?: string;
+}
+
+// ──────────────────────────────────────────────
+// Phase 7: Recurrence Tracking & Chronic Dumping Analytics
+// ──────────────────────────────────────────────
+
+export type RecurrenceClassification =
+  | 'chronic_dumping'
+  | 'emerging_hotspot'
+  | 'transient_spill'
+  | 'stabilized_cleared';
+
+export type PolicyInterventionType =
+  | 'infrastructure'
+  | 'enforcement'
+  | 'civic_awareness'
+  | 'collection_frequency';
+
+export interface PolicyRecommendation {
+  id: string;
+  type: PolicyInterventionType;
+  title: string;
+  description: string;
+  targetStakeholders: string[];
+  estimatedCostInr?: number;
+  priority: 'immediate' | 'high' | 'medium';
+  statutoryBacking?: string;
+}
+
+export interface HotspotRecurrenceProfile {
+  hotspotId: string;
+  zoneName: string;
+  classification: RecurrenceClassification;
+  /** 0 to 100 Index computed from frequency, total weight, span of days, and complaint density */
+  recurrenceIndex: number;
+  /** Number of days between first and most recent complaint */
+  temporalSpanDays: number;
+  /** Average interval in days between complaints */
+  averageIntervalDays: number;
+  /** Total historical complaint count linked to this zone */
+  complaintCount: number;
+  /** Total accumulated waste (kg) */
+  totalAccumulatedWasteKg: number;
+  /** Dominant waste category responsible for recurrence */
+  primaryDriver: WasteCategory;
+  /** Primary hazard */
+  hazardLevel: HazardLevel;
+  /** Risk rating */
+  chronicRisk: 'critical' | 'high' | 'moderate' | 'low';
+  /** Recommended preventive municipal policy interventions */
+  policyInterventions: PolicyRecommendation[];
+  /** Chronological report timeline breakdown */
+  timeline: {
+    date: string;
+    count: number;
+    wasteKg: number;
+  }[];
+}
+
+export interface WardRecurrenceAnalytics {
+  wardName: string;
+  totalHotspotsAnalyzed: number;
+  chronicHotspotsCount: number;
+  emergingHotspotsCount: number;
+  transientSpillsCount: number;
+  stabilizedCount: number;
+  averageWardRecurrenceScore: number;
+  highestRiskHotspotId?: string;
+  primaryRootCauses: {
+    category: WasteCategory;
+    percentage: number;
+    dumpCount: number;
+  }[];
+  actionableDirectives: PolicyRecommendation[];
+  synthesizedAt: string;
 }
 
