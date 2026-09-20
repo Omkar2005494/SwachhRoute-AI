@@ -262,8 +262,8 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No analysis data received in API response');
       }
 
-      setReports((prev) =>
-        prev.map((r) => {
+      setReports((prev) => {
+        const updatedReports = prev.map((r) => {
           if (r.id !== reportId) return r;
 
           const updated: WasteReport = {
@@ -279,8 +279,20 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
               analysis.estimatedWasteKg !== null ? analysis.estimatedWasteKg : r.estimatedWasteKg,
           };
           return updated;
-        })
-      );
+        });
+
+        try {
+          const metadataOnly = updatedReports.map((r) => {
+            const { photo: _photo, ...rest } = r;
+            return rest;
+          });
+          localStorage.setItem(LOCAL_STORAGE_METADATA_KEY, JSON.stringify(metadataOnly));
+        } catch (e) {
+          console.warn('Could not persist updated report metadata to localStorage:', e);
+        }
+
+        return updatedReports;
+      });
     } catch (err: any) {
       clearTimeout(timeoutTimer);
       const isTimeout = err?.name === 'AbortError';

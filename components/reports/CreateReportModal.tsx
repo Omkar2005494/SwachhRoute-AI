@@ -15,9 +15,11 @@ interface CreateReportModalProps {
 }
 
 const QUICK_COMPLAINTS = [
+  'Ghar ke paas thode dry wrappers aur plastic bottles pade hain.',
   'Yaha 3 din se kachra pada hai aur bahut smell aa rahi hai.',
-  'Kachra nullah ke paas pada hai, baarish mein blockage ho sakta hai.',
-  'Construction ka debris road ke side mein pada hai.',
+  'Nala kachre se poora block ho gaya hai, paani overflow hone ka khatra hai.',
+  'Hospital ke peeche used syringes aur biomedical waste phenka hua hai.',
+  'Road pe bohot bada construction concrete debris pada hai, rasta band hai.',
 ];
 
 const CATEGORIES: WasteCategory[] = [
