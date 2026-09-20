@@ -7,7 +7,7 @@ import { DEMO_DATA_NOTICE } from '@/data/demo';
 import { useReports } from '@/lib/reportsContext';
 
 export function Header() {
-  const { aiEngineStatus } = useReports();
+  const { aiEngineStatus, activeDataset, activeDatasetId } = useReports();
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-command-darkest/95 backdrop-blur-md border-b border-command-border px-4 lg:px-6 flex items-center justify-between">
@@ -35,16 +35,28 @@ export function Header() {
 
       {/* Center/Right Status Indicators */}
       <div className="flex items-center gap-3">
-        {/* MANDATORY SIMULATED DEMONSTRATION DATA BADGE */}
-        <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-amber-950/60 border border-amber-500/40 text-amber-300 text-xs font-mono">
-          <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-          <span className="hidden sm:inline font-semibold">{DEMO_DATA_NOTICE}</span>
-          <span className="sm:hidden font-semibold">Simulated Data</span>
+        {/* ACTIVE MUNICIPAL DATASET BADGE */}
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono border ${
+          activeDatasetId === 'demo_sample'
+            ? 'bg-amber-950/60 border-amber-500/40 text-amber-300'
+            : 'bg-cyan-950/60 border-cyan-500/40 text-cyan-300'
+        }`}>
+          <ShieldAlert className={`w-3.5 h-3.5 shrink-0 ${
+            activeDatasetId === 'demo_sample' ? 'text-amber-400' : 'text-cyan-400'
+          }`} />
+          <span className="hidden sm:inline font-semibold">
+            {activeDatasetId === 'demo_sample'
+              ? DEMO_DATA_NOTICE
+              : `Dataset: ${activeDataset.city} (${activeDataset.reports.length} Reports)`}
+          </span>
+          <span className="sm:hidden font-semibold">
+            {activeDataset.city} ({activeDataset.reports.length})
+          </span>
         </div>
 
         {/* Live Municipal Telemetry Indicator */}
         <Badge variant="cyan" pulse className="hidden lg:inline-flex font-mono text-[11px]">
-          Live Telemetry (Simulated)
+          {activeDatasetId === 'demo_sample' ? 'Live Telemetry (Simulated)' : `Live Telemetry: ${activeDataset.city}`}
         </Badge>
 
         {/* Local AI Engine Status Badge */}

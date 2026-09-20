@@ -129,6 +129,7 @@ export interface WasteReport {
   aiAnalysis?: ComplaintAnalysis;
   hotspotId?: string;
   wardName?: string;
+  citizenName?: string;
 }
 
 export type HotspotGeometryType = 'convex_hull' | 'operational_buffer';

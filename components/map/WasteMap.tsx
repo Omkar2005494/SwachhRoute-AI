@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, CircleMarker } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { WasteReport, Hotspot, FleetVehicle, OptimizedRoute } from '@/types';
+import { WasteReport, Hotspot, FleetVehicle, OptimizedRoute, MunicipalDepot } from '@/types';
 import { DEMONSTRATION_DEPOT } from '@/data/demo';
 import { formatCategoryLabel, formatHazardLabel, formatMachineryLabel } from '@/lib/formatters';
 import { Layers, Eye, EyeOff, MapPin, Truck, Flame, Navigation, AlertTriangle, ShieldCheck } from 'lucide-react';
@@ -68,6 +68,14 @@ const depotIcon = L.divIcon({
   popupAnchor: [0, -16],
 });
 
+function MapViewController({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo(center, zoom, { duration: 1.2 });
+  }, [center[0], center[1], zoom, map]);
+  return null;
+}
+
 interface WasteMapProps {
   reports?: WasteReport[];
   hotspots?: Hotspot[];
@@ -77,6 +85,7 @@ interface WasteMapProps {
   zoom?: number;
   heightClass?: string;
   activeClusterEngine?: string;
+  depot?: MunicipalDepot;
 }
 
 export default function WasteMap({
@@ -84,11 +93,15 @@ export default function WasteMap({
   hotspots = [],
   fleet = [],
   routes = [],
-  center = [12.9716, 77.5946], // Synthetic Central Bengaluru coordinates
+  center,
   zoom = 12,
   heightClass = 'h-[520px]',
   activeClusterEngine = 'Python / Scikit-learn DBSCAN',
+  depot,
 }: WasteMapProps) {
+  const effectiveDepot = depot || DEMONSTRATION_DEPOT;
+  const effectiveCenter: [number, number] = center || effectiveDepot.coordinates;
+
   const [showReports, setShowReports] = useState(true);
   const [showHotspots, setShowHotspots] = useState(true);
   const [showFleet, setShowFleet] = useState(true);
@@ -180,11 +193,13 @@ export default function WasteMap({
 
       {/* Leaflet Map */}
       <MapContainer
-        center={center}
+        center={effectiveCenter}
         zoom={zoom}
         scrollWheelZoom={true}
         className="w-full h-full"
       >
+        <MapViewController center={effectiveCenter} zoom={zoom} />
+
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -192,12 +207,18 @@ export default function WasteMap({
         />
 
         {/* Central Municipal Depot */}
-        <Marker position={center} icon={depotIcon}>
+        <Marker position={effectiveDepot.coordinates} icon={depotIcon}>
           <Popup className="custom-popup">
-            <div className="p-1 space-y-1">
-              <div className="font-bold text-cyan-400 text-xs uppercase">Central Municipal Depot</div>
-              <div className="text-[11px] text-slate-300">Fleet Dispatch Center & Weighbridge</div>
-              <div className="text-[10px] font-mono text-slate-400">Lat: {center[0]}, Lng: {center[1]}</div>
+            <div className="p-1.5 space-y-1 min-w-[210px]">
+              <div className="flex items-center justify-between pb-1 border-b border-command-border">
+                <span className="font-bold text-xs text-blue-400 font-mono">{effectiveDepot.id}</span>
+                <Badge variant="cyan">Central Hub</Badge>
+              </div>
+              <div className="text-xs font-semibold text-slate-100">{effectiveDepot.name}</div>
+              <div className="text-[10px] text-slate-400">{effectiveDepot.address}</div>
+              <div className="text-[9px] text-amber-400/90 pt-1 border-t border-command-border/40 font-mono">
+                {effectiveDepot.label}
+              </div>
             </div>
           </Popup>
         </Marker>
@@ -344,26 +365,6 @@ export default function WasteMap({
               </CircleMarker>
             );
           })}
-
-        {/* Simulated Demonstration Depot Marker */}
-        <Marker
-          position={DEMONSTRATION_DEPOT.coordinates}
-          icon={createCustomIcon('#2563eb', '🏢', 'DEPOT')}
-        >
-          <Popup className="custom-popup">
-            <div className="p-1 space-y-1 min-w-[210px]">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-xs text-blue-400 font-mono">{DEMONSTRATION_DEPOT.id}</span>
-                <Badge variant="cyan">Central Hub</Badge>
-              </div>
-              <div className="text-xs font-semibold text-slate-100">{DEMONSTRATION_DEPOT.name}</div>
-              <div className="text-[10px] text-slate-400">{DEMONSTRATION_DEPOT.address}</div>
-              <div className="text-[9px] text-amber-400/90 pt-1 border-t border-command-border/40 font-mono">
-                {DEMONSTRATION_DEPOT.label}
-              </div>
-            </div>
-          </Popup>
-        </Marker>
 
         {/* Fleet Vehicle Telemetry */}
         {showFleet &&

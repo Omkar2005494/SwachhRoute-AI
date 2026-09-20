@@ -3,7 +3,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { Loader2, MapPin } from 'lucide-react';
-import { WasteReport, Hotspot, FleetVehicle, OptimizedRoute } from '@/types';
+import { WasteReport, Hotspot, FleetVehicle, OptimizedRoute, MunicipalDepot } from '@/types';
 
 interface MapWrapperProps {
   reports?: WasteReport[];
@@ -14,6 +14,7 @@ interface MapWrapperProps {
   zoom?: number;
   heightClass?: string;
   activeClusterEngine?: string;
+  depot?: MunicipalDepot;
 }
 
 // Dynamically import Leaflet map with SSR disabled

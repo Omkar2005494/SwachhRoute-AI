@@ -24,7 +24,20 @@ import {
   HotspotUrgency,
 } from '@/types';
 import { DEMO_REPORTS, DEMO_HOTSPOTS, DEMO_FLEET, DEMO_ROUTES, DEMONSTRATION_DEPOT } from '@/data/demo';
-import { validateReportInput, RawReportInput } from '@/services/dataProcessing';
+import {
+  MunicipalDataset,
+  MunicipalDatasetSummary,
+  AVAILABLE_DATASETS,
+  getDatasetById,
+  getDefaultDataset,
+  PUNE_WARD_12_DATASET,
+} from '@/data/datasets';
+import {
+  validateReportInput,
+  RawReportInput,
+  exportReportsToCSV,
+  exportReportsToGeoJSON,
+} from '@/services/dataProcessing';
 import { clusterWasteReports } from '@/services/geospatial';
 import { optimizeFleetRoutes } from '@/services/optimization';
 import { getRoadRoute, clearRoadRoutingCache } from '@/services/routing';
@@ -88,6 +101,14 @@ interface ReportsContextType {
   approveDispatch: (routeId: string, manifestId: string) => Promise<{ success: boolean; error?: string }>;
   rejectDispatch: (routeId: string, manifestId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
   checkAIHealth: () => Promise<void>;
+  activeDatasetId: string;
+  activeDataset: MunicipalDataset;
+  activeDepot: MunicipalDepot;
+  availableDatasets: MunicipalDatasetSummary[];
+  switchDataset: (datasetId: string) => Promise<void>;
+  importCustomDataset: (importedReports: WasteReport[], name?: string, city?: string) => Promise<void>;
+  exportReports: (format: 'csv' | 'geojson') => string;
+  resetCurrentDataset: () => Promise<void>;
 }
 
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
@@ -134,21 +155,26 @@ function mapAIMachineryToDomain(machinery: string): MachineryType[] {
 }
 
 export function ReportsProvider({ children }: { children: React.ReactNode }) {
+  const [activeDatasetId, setActiveDatasetId] = useState<string>('pune_ward_12');
+  const [activeDataset, setActiveDataset] = useState<MunicipalDataset>(() => getDatasetById('pune_ward_12'));
+  const [activeDepot, setActiveDepot] = useState<MunicipalDepot>(() => getDatasetById('pune_ward_12').depot);
+
   const [reports, setReports] = useState<WasteReport[]>(() => {
-    return DEMO_REPORTS.map((r) => ({
+    const initialDataset = getDatasetById('pune_ward_12');
+    return initialDataset.reports.map((r) => ({
       ...r,
       aiStatus: r.aiAnalyzed ? ('complete' as AIStatus) : ('pending' as AIStatus),
     }));
   });
 
-  const [hotspots, setHotspots] = useState<Hotspot[]>(DEMO_HOTSPOTS);
+  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [clusteringResult, setClusteringResult] = useState<ClusteringResult | null>(null);
   const [isClustering, setIsClustering] = useState(false);
   const [geospatialEngine, setGeospatialEngine] = useState<string>('Python / Scikit-learn DBSCAN');
 
   // Fleet & CVRP Route Optimization State
-  const [fleet, setFleet] = useState<FleetVehicle[]>(DEMO_FLEET);
-  const [routes, setRoutes] = useState<OptimizedRoute[]>(DEMO_ROUTES);
+  const [fleet, setFleet] = useState<FleetVehicle[]>(() => getDatasetById('pune_ward_12').fleet);
+  const [routes, setRoutes] = useState<OptimizedRoute[]>([]);
   const [optimizationResult, setOptimizationResult] = useState<OptimizationResult | null>(null);
   const [isOptimizingRoutes, setIsOptimizingRoutes] = useState<boolean>(false);
   const [isRoadRouting, setIsRoadRouting] = useState<boolean>(false);
@@ -582,7 +608,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const result = await optimizeFleetRoutes({
-        depot: DEMONSTRATION_DEPOT,
+        depot: activeDepot,
         hotspots,
         vehicles: fleet,
         maxTimeSeconds: 5,
@@ -680,7 +706,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsOptimizingRoutes(false);
     }
-  }, [isOptimizingRoutes, hotspots, fleet, recalculateRoadRoutes]);
+  }, [isOptimizingRoutes, hotspots, fleet, activeDepot, recalculateRoadRoutes]);
 
   // Phase 6B: Driver Shift Manifest Actions
   const generateManifest = useCallback(
@@ -692,7 +718,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
           console.warn(`[ReportsContext] Route ${routeId} not found for manifest generation.`);
           return undefined;
         }
-        const manifest = generateDriverManifest(route, hotspots, fleet, DEMONSTRATION_DEPOT);
+        const manifest = generateDriverManifest(route, hotspots, fleet, activeDepot);
         setDriverManifests((prev) => {
           const filtered = prev.filter((m) => m.routeId !== routeId);
           return [...filtered, manifest];
@@ -705,7 +731,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
         setIsGeneratingManifest(false);
       }
     },
-    [routes, hotspots, fleet]
+    [routes, hotspots, fleet, activeDepot]
   );
 
   const regenerateManifest = useCallback(
@@ -722,7 +748,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
           console.warn(`[ReportsContext] Route ${existing.routeId} not found for manifest regeneration.`);
           return undefined;
         }
-        const updatedManifest = generateDriverManifest(route, hotspots, fleet, DEMONSTRATION_DEPOT);
+        const updatedManifest = generateDriverManifest(route, hotspots, fleet, activeDepot);
         setDriverManifests((prev) =>
           prev.map((m) => (m.manifestId === manifestId ? updatedManifest : m))
         );
@@ -734,7 +760,7 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
         setIsGeneratingManifest(false);
       }
     },
-    [driverManifests, routes, hotspots, fleet]
+    [driverManifests, routes, hotspots, fleet, activeDepot]
   );
 
   const getManifestForRoute = useCallback(
@@ -1192,6 +1218,162 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [officerOverrides, firestoreReady]);
 
+  // ─── Real Municipal Dataset Management ──────
+  const switchDataset = useCallback(
+    async (datasetId: string) => {
+      const targetDataset = getDatasetById(datasetId);
+      if (!targetDataset) return;
+
+      setActiveDatasetId(targetDataset.id);
+      setActiveDataset(targetDataset);
+      setActiveDepot(targetDataset.depot);
+      setFleet(targetDataset.fleet);
+      setRoutes([]);
+      setOptimizationResult(null);
+      setDriverManifests([]);
+      setOfficerOverrides([]);
+      clearRoadRoutingCache();
+
+      const formattedReports: WasteReport[] = targetDataset.reports.map((r) => ({
+        ...r,
+        aiStatus: r.aiAnalyzed ? ('complete' as AIStatus) : ('pending' as AIStatus),
+      }));
+
+      setReports(formattedReports);
+      reportsRef.current = formattedReports;
+
+      try {
+        localStorage.setItem('swachhroute_active_dataset_id_v1', targetDataset.id);
+      } catch {}
+
+      await executeClustering(formattedReports);
+    },
+    [executeClustering]
+  );
+
+  const importCustomDataset = useCallback(
+    async (
+      importedReports: WasteReport[],
+      customName = 'Custom Municipal Telemetry',
+      customCity = 'Custom Municipal Area'
+    ) => {
+      if (!importedReports || importedReports.length === 0) return;
+
+      // Compute center coordinates
+      const lats = importedReports.map((r) => r.latitude);
+      const lngs = importedReports.map((r) => r.longitude);
+      const avgLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+      const avgLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+
+      const customDepot: MunicipalDepot = {
+        id: `DEPOT-IMP-${Date.now().toString(36).slice(-4).toUpperCase()}`,
+        name: `${customCity} Operations Depot & Weighbridge`,
+        address: `Operations Center, ${customCity}`,
+        coordinates: [parseFloat(avgLat.toFixed(6)), parseFloat(avgLng.toFixed(6))],
+        label: `${customName} Hub (EPSG:4326)`,
+      };
+
+      const customDataset: MunicipalDataset = {
+        id: 'custom_import',
+        name: customName,
+        city: customCity,
+        state: 'India',
+        wardOrZone: 'Custom Operations Ward',
+        description: `User-imported municipal dataset containing ${importedReports.length} complaints.`,
+        depot: customDepot,
+        fleet: [
+          {
+            id: 'IMP-COMP-01',
+            registrationNumber: 'DL-01-XX-1101',
+            vehicleType: 'hydraulic_compactor',
+            capacityKg: 6000,
+            currentLoadKg: 0,
+            status: 'available',
+            currentLocation: [parseFloat(avgLat.toFixed(6)), parseFloat(avgLng.toFixed(6))],
+            fuelType: 'cng',
+            depotId: customDepot.id,
+            availableForDispatch: true,
+            driverName: 'Municipal Driver 1',
+            driverPhone: '+91 99000 11001',
+          },
+          {
+            id: 'IMP-TIP-01',
+            registrationNumber: 'DL-01-XX-1102',
+            vehicleType: 'mini_tipper',
+            capacityKg: 2500,
+            currentLoadKg: 0,
+            status: 'available',
+            currentLocation: [parseFloat(avgLat.toFixed(6)), parseFloat(avgLng.toFixed(6))],
+            fuelType: 'electric',
+            depotId: customDepot.id,
+            availableForDispatch: true,
+            driverName: 'Municipal Driver 2',
+            driverPhone: '+91 99000 11002',
+          },
+          {
+            id: 'IMP-BACK-01',
+            registrationNumber: 'DL-01-XX-1103',
+            vehicleType: 'backhoe',
+            capacityKg: 8000,
+            currentLoadKg: 0,
+            status: 'available',
+            currentLocation: [parseFloat(avgLat.toFixed(6)), parseFloat(avgLng.toFixed(6))],
+            fuelType: 'diesel',
+            depotId: customDepot.id,
+            availableForDispatch: true,
+            driverName: 'Municipal Driver 3',
+            driverPhone: '+91 99000 11003',
+          },
+        ],
+        defaultCenter: [parseFloat(avgLat.toFixed(6)), parseFloat(avgLng.toFixed(6))],
+        defaultZoom: 13,
+        boundary: {
+          name: `${customCity} Boundary Envelope`,
+          minLat: Math.min(...lats) - 0.05,
+          maxLat: Math.max(...lats) + 0.05,
+          minLng: Math.min(...lngs) - 0.05,
+          maxLng: Math.max(...lngs) + 0.05,
+        },
+        reports: importedReports,
+      };
+
+      setActiveDatasetId('custom_import');
+      setActiveDataset(customDataset);
+      setActiveDepot(customDepot);
+      setFleet(customDataset.fleet);
+      setRoutes([]);
+      setOptimizationResult(null);
+      setDriverManifests([]);
+      setOfficerOverrides([]);
+      clearRoadRoutingCache();
+
+      const formattedReports: WasteReport[] = importedReports.map((r) => ({
+        ...r,
+        aiStatus: r.aiAnalyzed ? ('complete' as AIStatus) : ('pending' as AIStatus),
+      }));
+
+      setReports(formattedReports);
+      reportsRef.current = formattedReports;
+
+      await executeClustering(formattedReports);
+    },
+    [executeClustering]
+  );
+
+  const exportReports = useCallback(
+    (format: 'csv' | 'geojson'): string => {
+      if (format === 'geojson') {
+        return exportReportsToGeoJSON(reports);
+      }
+      return exportReportsToCSV(reports);
+    },
+    [reports]
+  );
+
+  const resetCurrentDataset = useCallback(async () => {
+    await switchDataset(activeDatasetId);
+  }, [switchDataset, activeDatasetId]);
+
   const totalReports = reports.length;
   const activeHotspots = hotspots.filter((h) => h.status === 'active').length;
   const highPriorityHotspots = hotspots.filter(
@@ -1248,6 +1430,14 @@ export function ReportsProvider({ children }: { children: React.ReactNode }) {
         approveDispatch,
         rejectDispatch,
         checkAIHealth,
+        activeDatasetId,
+        activeDataset,
+        activeDepot,
+        availableDatasets: AVAILABLE_DATASETS,
+        switchDataset,
+        importCustomDataset,
+        exportReports,
+        resetCurrentDataset,
       }}
     >
       {children}

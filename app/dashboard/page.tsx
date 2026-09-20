@@ -11,6 +11,7 @@ import { DriverManifestWidget } from '@/components/dashboard/DriverManifestWidge
 import { OfficerStatusWidget } from '@/components/dashboard/OfficerStatusWidget';
 import { MapFoundation } from '@/components/map/MapContainer';
 import { useReports } from '@/lib/reportsContext';
+import { DatasetSelector } from '@/components/datasets';
 import { Activity, Radio, MapPin, RefreshCw, Cpu } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -23,6 +24,8 @@ export default function DashboardPage() {
     isClustering,
     fleet,
     routes,
+    activeDataset,
+    activeDepot,
   } = useReports();
 
   return (
@@ -44,8 +47,10 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-300">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-command-surface border border-command-border">
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span>SECTOR: BENGALURU METROPOLITAN (SYNTHETIC)</span>
+            <span className="font-semibold">SECTOR: {activeDataset.city.toUpperCase()} ({activeDataset.wardOrZone.toUpperCase()})</span>
           </div>
+
+          <DatasetSelector compact />
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-command-surface border border-command-border text-cyan-300">
             <Cpu className="w-3.5 h-3.5 text-cyan-400" />
@@ -73,7 +78,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 text-xs font-mono uppercase text-slate-300">
             <MapPin className="w-4 h-4 text-cyan-400" />
             <span className="font-semibold">Geospatial Situation Map</span>
-            <span className="text-slate-500 font-normal">| Live Layer Synthesis</span>
+            <span className="text-slate-500 font-normal">| {activeDataset.name}</span>
           </div>
           <span className="text-[11px] font-mono text-cyan-400">
             EPSG:4326 Display • EPSG:3857 Clustering & CVRP Engine Ready
@@ -85,6 +90,9 @@ export default function DashboardPage() {
           hotspots={hotspots}
           fleet={fleet}
           routes={routes}
+          center={activeDataset.defaultCenter}
+          zoom={activeDataset.defaultZoom}
+          depot={activeDepot}
           heightClass="h-[520px]"
           activeClusterEngine={geospatialEngine}
         />

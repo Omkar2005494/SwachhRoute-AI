@@ -8,6 +8,7 @@ import { WasteCategory, WasteReport } from '@/types';
 import { formatCategoryLabel, formatDateTime } from '@/lib/formatters';
 import { CreateReportModal } from '@/components/reports/CreateReportModal';
 import { AIIntelligenceModal } from '@/components/reports/AIIntelligenceModal';
+import { DatasetSelector } from '@/components/datasets';
 import {
   FileText,
   Plus,
@@ -100,6 +101,9 @@ export default function ReportsPage() {
           </button>
         </div>
       </div>
+
+      {/* Municipal Dataset Ingestion & Switcher Toolbar */}
+      <DatasetSelector />
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-command-card/80 border border-command-border">
